@@ -39,7 +39,7 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 		EnableContentResponseOnWrite: true,
 	}
 
-	key := portitionKey("underlayName")
+	key := partitionKey("underlayName")
 	// res, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
 	_, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
 	if err != nil {

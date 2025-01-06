@@ -65,7 +65,7 @@ type ContainerClient interface {
 	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 }
 
-func portitionKey(val string) azcosmos.PartitionKey {
+func partitionKey(val string) azcosmos.PartitionKey {
 	return azcosmos.NewPartitionKeyString(val)
 }
 

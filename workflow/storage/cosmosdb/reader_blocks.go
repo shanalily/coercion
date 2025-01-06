@@ -57,7 +57,7 @@ func (p reader) fetchBlockByID(ctx context.Context, id uuid.UUID) (*workflow.Blo
 		EnableContentResponseOnWrite: true,
 	}
 
-	key := portitionKey("underlayName")
+	key := partitionKey("underlayName")
 	res, err := p.cc.GetBlocksClient().ReadItem(ctx, key, id.String(), itemOpt)
 	if err != nil {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))

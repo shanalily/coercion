@@ -36,7 +36,7 @@ func (r reader) fetchActionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*work
 	actions := make([]*workflow.Action, 0, len(ids))
 
 	// query, args := replaceWithIDs(fetchActionsByID, "$ids", ids)
-	_ , _ = replaceWithIDs(fetchActionsByID, "$ids", ids)
+	_, _ = replaceWithIDs(fetchActionsByID, "$ids", ids)
 
 	// err := cosmosdbx.Execute(
 	// 	conn,

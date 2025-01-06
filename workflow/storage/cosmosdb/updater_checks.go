@@ -9,7 +9,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.ChecksUpdater = checksUpdater{}
@@ -17,7 +17,7 @@ var _ storage.ChecksUpdater = checksUpdater{}
 // checksUpdater implements the storage.checksUpdater interface.
 type checksUpdater struct {
 	mu *sync.Mutex
-	cc *azcosmos.ContainerClient
+	cc ContainerClient
 
 	private.Storage
 }

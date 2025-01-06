@@ -54,7 +54,7 @@ type blocksEntry struct {
 	name              string `json:"name,omitempty"`
 	descr             string `json:"descr,omitempty"`
 	pos               int64  `json:"pos,omitempty"`
-	entranceDelay      int64  `json:"entranceDelay,omitempty"`
+	entranceDelay     int64  `json:"entranceDelay,omitempty"`
 	exitDelay         int64  `json:"exitDelay,omitempty"`
 	bypassChecks      string `json:"bypassChecks,omitempty"`
 	preChecks         string `json:"preChecks,omitempty"`
@@ -62,7 +62,7 @@ type blocksEntry struct {
 	contChecks        string `json:"contChecks,omitempty"`
 	deferredChecks    string `json:"deferredChecks,omitempty"`
 	sequences         string `json:"sequences,omitempty"`
-    concurrency int64  `json:"concurrency,omitempty"`
+	concurrency       int64  `json:"concurrency,omitempty"`
 	toleratedFailures int64  `json:"toleratedFailures,omitempty"`
 	stateStatus       int64  `json:"stateStatus,omitempty"`
 	stateStart        int64  `json:"stateStart,omitempty"`

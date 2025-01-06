@@ -24,10 +24,10 @@ type updater struct {
 
 func newUpdater(mu *sync.Mutex, cc *CosmosDBClient) updater {
 	return updater{
-		planUpdater:     planUpdater{mu: mu, cc: cc.plansClient},
-		checksUpdater:   checksUpdater{mu: mu, cc: cc.checksClient},
-		blockUpdater:    blockUpdater{mu: mu, cc: cc.blocksClient},
-		sequenceUpdater: sequenceUpdater{mu: mu, cc: cc.sequencesClient},
-		actionUpdater:   actionUpdater{mu: mu, cc: cc.actionsClient},
+		planUpdater:     planUpdater{mu: mu, cc: cc.GetPlansClient()},
+		checksUpdater:   checksUpdater{mu: mu, cc: cc.GetChecksClient()},
+		blockUpdater:    blockUpdater{mu: mu, cc: cc.GetBlocksClient()},
+		sequenceUpdater: sequenceUpdater{mu: mu, cc: cc.GetSequencesClient()},
+		actionUpdater:   actionUpdater{mu: mu, cc: cc.GetActionsClient()},
 	}
 }

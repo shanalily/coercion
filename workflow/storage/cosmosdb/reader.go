@@ -2,7 +2,9 @@ package cosmosdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 	"unsafe"
@@ -11,10 +13,10 @@ import (
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 // reader implements the storage.PlanReader interface.
@@ -23,11 +25,32 @@ type reader struct {
 	reg *registry.Register
 }
 
+// IsNotFound checks if the error that Azure returned is 404.
+func IsNotFound(err error) bool {
+	var resErr *azcore.ResponseError
+	return errors.As(err, &resErr) && resErr.StatusCode == http.StatusNotFound
+}
+
 // Exists returns true if the Plan ID exists in the storage.
 func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 	const q = "SELECT COUNT(*) FROM 'plans' WHERE 'id' = ?;"
 
-	count := -1
+	var itemOpt = &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+
+	key := portitionKey("underlayName")
+	// res, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
+	_, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
+	if err != nil {
+		if IsNotFound(err) {
+			return false, nil
+		}
+		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
+		return false, fmt.Errorf("couldn't fetch block by id: %w", err)
+	}
+
+	// count := -1
 	// err = cosmosdbx.ExecuteTransient(
 	// 	conn,
 	// 	q,
@@ -47,7 +70,8 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 	// if count < 0 {
 	// 	return false, fmt.Errorf("bug: unexpected count value: %d", count)
 	// }
-	return count > 0, nil
+	// return count > 0, nil
+	return true, nil
 }
 
 // ReadPlan returns a Plan from the storage.

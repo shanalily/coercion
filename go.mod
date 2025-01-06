@@ -13,8 +13,10 @@ require (
 	github.com/gostdlib/concurrency v0.0.0-20240403195145-a5b82e576be2
 	github.com/gostdlib/ops v0.0.0-20240403194558-b078d352f3fc
 	github.com/kylelemons/godebug v1.1.0
+	github.com/samber/lo v1.47.0
 	github.com/spf13/afero v1.11.0
 	github.com/tidwall/pretty v1.2.1
+	google.golang.org/protobuf v1.33.0
 	zombiezen.com/go/sqlite v1.3.0
 )
 

@@ -9,7 +9,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.SequenceUpdater = sequenceUpdater{}
@@ -17,7 +17,7 @@ var _ storage.SequenceUpdater = sequenceUpdater{}
 // sequenceUpdater implements the storage.sequenceUpdater interface.
 type sequenceUpdater struct {
 	mu *sync.Mutex
-	cc *azcosmos.ContainerClient
+	cc ContainerClient
 
 	private.Storage
 }

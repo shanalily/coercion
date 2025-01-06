@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-json-experiment/json"
 	"github.com/element-of-surprise/coercion/workflow"
+	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
@@ -58,17 +58,13 @@ func (p reader) fetchBlockByID(ctx context.Context, id uuid.UUID) (*workflow.Blo
 	}
 
 	key := portitionKey("underlayName")
-	res, err := p.cc.blocksClient.ReadItem(ctx, key, id.String(), itemOpt)
+	res, err := p.cc.GetBlocksClient().ReadItem(ctx, key, id.String(), itemOpt)
 	if err != nil {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
 		return nil, fmt.Errorf("couldn't fetch block by id: %w", err)
 	}
 
 	return p.blockRowToBlock(ctx, &res)
-}
-
-func portitionKey(val string) azcosmos.PartitionKey {
-	return azcosmos.NewPartitionKeyString(val)
 }
 
 // blockRowToBlock converts a cosmosdb row to a workflow.Block.

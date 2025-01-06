@@ -19,6 +19,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow/storage"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 
 	_ "embed"
@@ -54,6 +55,28 @@ type Option func(*Vault) error
 // 	}
 // }
 
+// ContainerClient allows for faking the azcosmos container client.
+type ContainerClient interface {
+	CreateItem(context.Context, azcosmos.PartitionKey, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+	DeleteItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+	NewQueryItemsPager(string, azcosmos.PartitionKey, *azcosmos.QueryOptions) *runtime.Pager[azcosmos.QueryItemsResponse]
+	Read(context.Context, *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error)
+	ReadItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+}
+
+func portitionKey(val string) azcosmos.PartitionKey {
+	return azcosmos.NewPartitionKeyString(val)
+}
+
+type Client interface {
+	GetPlansClient() ContainerClient     //*azcosmos.ContainerClient
+	GetBlocksClient() ContainerClient    //*azcosmos.ContainerClient
+	GetChecksClient() ContainerClient    // *azcosmos.ContainerClient
+	GetSequencesClient() ContainerClient //*azcosmos.ContainerClient
+	GetActionsClient() ContainerClient   //*azcosmos.ContainerClient
+}
+
 // CosmosDBClient has the methods for all of Create/Update/Delete/Query operation
 // on data model.
 type CosmosDBClient struct {
@@ -74,23 +97,23 @@ type CosmosDBClient struct {
 // 	NewListItemsRawPager() datamodel.Pager[C]
 // }
 
-func (c *CosmosDBClient) GetPlansClient() *azcosmos.ContainerClient {
+func (c *CosmosDBClient) GetPlansClient() ContainerClient {
 	return c.plansClient
 }
 
-func (c *CosmosDBClient) GetBlocksClient() *azcosmos.ContainerClient {
+func (c *CosmosDBClient) GetBlocksClient() ContainerClient {
 	return c.blocksClient
 }
 
-func (c *CosmosDBClient) GetChecksClient() *azcosmos.ContainerClient {
+func (c *CosmosDBClient) GetChecksClient() ContainerClient {
 	return c.checksClient
 }
 
-func (c *CosmosDBClient) GetSequencesClient() *azcosmos.ContainerClient {
+func (c *CosmosDBClient) GetSequencesClient() ContainerClient {
 	return c.sequencesClient
 }
 
-func (c *CosmosDBClient) GetActionsClient() *azcosmos.ContainerClient {
+func (c *CosmosDBClient) GetActionsClient() ContainerClient {
 	return c.actionsClient
 }
 

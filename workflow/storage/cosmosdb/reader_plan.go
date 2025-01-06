@@ -22,7 +22,7 @@ func (p reader) fetchPlan(ctx context.Context, id uuid.UUID) (*workflow.Plan, er
 
 	// need to get partition key
 	key := portitionKey("underlayName")
-	res, err := p.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
+	res, err := p.cc.GetPlansClient().ReadItem(ctx, key, id.String(), itemOpt)
 	if err != nil {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
 		return nil, fmt.Errorf("couldn't fetch plan: %w", err)

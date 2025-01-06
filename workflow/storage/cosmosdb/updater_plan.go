@@ -8,9 +8,8 @@ import (
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
-
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.PlanUpdater = planUpdater{}
@@ -18,7 +17,7 @@ var _ storage.PlanUpdater = planUpdater{}
 // planUpdater implements the storage.PlanUpdater interface.
 type planUpdater struct {
 	mu *sync.Mutex
-	cc *azcosmos.ContainerClient
+	cc ContainerClient
 
 	private.Storage
 }

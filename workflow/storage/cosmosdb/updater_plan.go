@@ -2,15 +2,14 @@ package cosmosdb
 
 import (
 	"context"
-	"fmt"
+	// "fmt"
 	"sync"
 
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
 
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 

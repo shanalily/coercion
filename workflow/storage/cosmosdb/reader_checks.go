@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-json-experiment/json"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
@@ -66,7 +65,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	var resp checksEntry
 	err = json.Unmarshal(response.Value, &resp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	c := &workflow.Checks{}
@@ -74,7 +73,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: couldn't convert ID to UUID: %w", err)
 	}
-	k := resp.Key
+	k := resp.key
 	if k != "" {
 		c.Key, err = uuid.Parse(k)
 		if err != nil {
@@ -82,7 +81,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 		}
 	}
 	c.Delay = time.Duration(resp.delay)
-	c.State, err = strToState(stmt)
+	c.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: %w", err)
 	}

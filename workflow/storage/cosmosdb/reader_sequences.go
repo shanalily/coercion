@@ -4,17 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-json-experiment/json"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 // fieldToSequences converts the "sequences" field in a cosmosdb row to a list of workflow.Sequences.
-func (p reader) fieldToSequences(ctx context.Context) ([]*workflow.Sequence, error) {
-	ids, err := fieldToIDs("sequences", stmt)
+func (p reader) strToSequences(ctx context.Context, sequenceIDs string) ([]*workflow.Sequence, error) {
+	ids, err := strToIDs(sequenceIDs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read plan sequence ids: %w", err)
 	}
@@ -63,27 +62,33 @@ func (p reader) fetchSequenceByID(ctx context.Context, id uuid.UUID) (*workflow.
 }
 
 // sequenceRowToSequence converts a cosmosdb row to a workflow.Sequence.
-func (p reader) sequenceRowToSequence(ctx context.Context) (*workflow.Sequence, error) {
+func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.ItemResponse) (*workflow.Sequence, error) {
 	var err error
-	s := &workflow.Sequence{}
-	s.ID, err = fieldToID("id", stmt)
+	var resp sequencesEntry
+	err = json.Unmarshal(response.Value, &resp)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read block id: %w", err)
+		return nil, err
 	}
-	k := stmt.GetText("key")
+
+	s := &workflow.Sequence{}
+	s.ID, err = uuid.Parse(resp.id)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse sequence id: %w", err)
+	}
+	k := resp.key
 	if k != "" {
 		s.Key, err = uuid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse sequence key: %w", err)
 		}
 	}
-	s.Name = stmt.GetText("name")
-	s.Descr = stmt.GetText("descr")
-	s.State, err = fieldToState(stmt)
+	s.Name = resp.name
+	s.Descr = resp.descr
+	s.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
 	if err != nil {
-		return nil, fmt.Errorf("sequenceRowToSequence: %w", err)
+		return nil, fmt.Errorf("couldn't get sequence state: %w", err)
 	}
-	s.Actions, err = p.fieldToActions(ctx, stmt)
+	s.Actions, err = p.strToActions(ctx, resp.actions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read sequence actions: %w", err)
 	}

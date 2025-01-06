@@ -8,9 +8,8 @@ import (
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 // creator implements the storage.creator interface.

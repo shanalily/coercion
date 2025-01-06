@@ -7,10 +7,8 @@ import (
 
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 type deleter struct {
@@ -92,7 +90,8 @@ func (d deleter) deleteBlocks(ctx context.Context, blocks []*workflow.Block) err
 		}
 	}
 
-	for _, block := range blocks {
+	// for _, block := range blocks {
+	for _, _ = range blocks {
 		// stmt, err := conn.Prepare(delteBlocksByID)
 		// if err != nil {
 		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
@@ -138,7 +137,8 @@ func (d deleter) deletesSeqs(ctx context.Context, seqs []*workflow.Sequence) err
 		}
 	}
 
-	for _, seq := range seqs {
+	// for _, seq := range seqs {
+	for _, _ = range seqs {
 		// stmt, err := conn.Prepare(deleteSequencesByID)
 		// if err != nil {
 		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
@@ -157,7 +157,8 @@ func (d deleter) deleteActions(ctx context.Context, actions []*workflow.Action) 
 		return nil
 	}
 
-	for _, action := range actions {
+	// for _, action := range actions {
+	for _, _ = range actions {
 		// stmt, err := conn.Prepare(deleteActionsByID)
 		// if err != nil {
 		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)

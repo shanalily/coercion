@@ -10,10 +10,8 @@ import (
 
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 const insertPlan = `

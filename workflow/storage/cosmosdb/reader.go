@@ -13,10 +13,8 @@ import (
 
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 // reader implements the storage.PlanReader interface.
@@ -63,7 +61,8 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 		return nil, fmt.Errorf("invalid filter: %w", err)
 	}
 
-	q, args, named := r.buildSearchQuery(filters)
+	// q, args, named := r.buildSearchQuery(filters)
+	_, _, _ = r.buildSearchQuery(filters)
 
 	results := make(chan storage.Stream[storage.ListResult], 1)
 
@@ -239,7 +238,7 @@ func fieldToID(id string) (uuid.UUID, error) {
 
 // fieldToIDs returns the IDs from the statement field. Field must the a blob
 // encoded as a JSON array that has string UUIDs in v7 format.
-func fieldToIDs(id string) ([]uuid.UUID, error) {
+func strToIDs(id string) ([]uuid.UUID, error) {
 	contents := strToBytes(id)
 	if contents == nil {
 		return nil, fmt.Errorf("actions IDs are nil")
@@ -264,18 +263,13 @@ func strToBytes(s string) []byte {
 	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
-// fieldToBytes returns the bytes of the field from the statement.
-func fieldToBytes(val any) []byte {
-	b := make([]byte, val)
-	stmt.GetBytes(field, b)
-	return b
-}
+// // fieldToBytes returns the bytes of the field from the statement.
+// func fieldToBytes(val any) []byte {
+// 	b := make([]byte, val)
+// 	return b
+// }
 
-func timeFromInt64(t int64) (time.Time, error) {
-	unixTime := stmt.GetInt64(t)
-	if unixTime == 0 {
-		return time.Time{}, nil
-	}
+func timeFromInt64(unixTime int64) (time.Time, error) {
 	t := time.Unix(0, unixTime)
 	if t.Before(zeroTime) {
 		return time.Time{}, nil
@@ -286,11 +280,11 @@ func timeFromInt64(t int64) (time.Time, error) {
 // fieldToState pulls the state_start, state_end and state_status from a stmt
 // and turns them into a *workflow.State.
 func fieldToState(stateStatus, stateStart, stateEnd int64) (*workflow.State, error) {
-	start, err := timeFromField(stateStart)
+	start, err := timeFromInt64(stateStart)
 	if err != nil {
 		return nil, err
 	}
-	end, err := timeFromField(stateEnd)
+	end, err := timeFromInt64(stateEnd)
 	if err != nil {
 		return nil, err
 	}

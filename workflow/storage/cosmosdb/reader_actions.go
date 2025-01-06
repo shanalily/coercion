@@ -3,21 +3,19 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	"reflect"
+	// "reflect"
 	"time"
 
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
-	// "zombiezen.com/go/cosmosdb"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 // fieldToActions converts the "actions" field in a cosmosdb row to a list of workflow.Actions.
-func (r reader) fieldToActions(ctx context.Context) ([]*workflow.Action, error) {
-	ids, err := fieldToIDs("actions", stmt)
+func (r reader) strToActions(ctx context.Context, actionIDs string) ([]*workflow.Action, error) {
+	ids, err := strToIDs(actionIDs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read action ids: %w", err)
 	}
@@ -37,7 +35,8 @@ func (r reader) fetchActionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*work
 
 	actions := make([]*workflow.Action, 0, len(ids))
 
-	query, args := replaceWithIDs(fetchActionsByID, "$ids", ids)
+	// query, args := replaceWithIDs(fetchActionsByID, "$ids", ids)
+	_ , _ = replaceWithIDs(fetchActionsByID, "$ids", ids)
 
 	// err := cosmosdbx.Execute(
 	// 	conn,
@@ -68,10 +67,9 @@ func (r reader) actionRowToAction(ctx context.Context, response *azcosmos.ItemRe
 	var resp actionsEntry
 	err = json.Unmarshal(response.Value, &resp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var err error
 	a := &workflow.Action{}
 	a.ID, err = uuid.Parse(resp.id)
 	if err != nil {
@@ -85,41 +83,41 @@ func (r reader) actionRowToAction(ctx context.Context, response *azcosmos.ItemRe
 		}
 	}
 	a.Name = resp.name
-	a.Descr = resp.desc
+	a.Descr = resp.descr
 	a.Plugin = resp.plugin
 	a.Timeout = time.Duration(resp.timeout)
 	a.Retries = int(resp.retries)
 	a.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
 	if err != nil {
-		return fmt.Errorf("couldn't get action state: %w", err)
+		return nil, fmt.Errorf("couldn't get action state: %w", err)
 	}
 	plug := r.reg.Plugin(a.Plugin)
 	if plug == nil {
 		return nil, fmt.Errorf("couldn't find plugin %s", a.Plugin)
 	}
 
-	b := fieldToBytes(resp.req)
-	if len(b) > 0 {
-		req := plug.Request()
-		if req != nil {
-			if reflect.TypeOf(req).Kind() != reflect.Pointer {
-				if err := json.Unmarshal(b, &req); err != nil {
-					return nil, fmt.Errorf("couldn't unmarshal request: %w", err)
-				}
-			} else {
-				if err := json.Unmarshal(b, req); err != nil {
-					return nil, fmt.Errorf("couldn't unmarshal request: %w", err)
-				}
-			}
-			a.Req = req
-		}
-	}
-	b = fieldToBytes(resp.attempts)
-	if len(b) > 0 {
-		a.Attempts, err = decodeAttempts(b, plug)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't decode attempts: %w", err)
-		}
-	}
+	// b := fieldToBytes(resp.req)
+	// if len(b) > 0 {
+	// 	req := plug.Request()
+	// 	if req != nil {
+	// 		if reflect.TypeOf(req).Kind() != reflect.Pointer {
+	// 			if err := json.Unmarshal(b, &req); err != nil {
+	// 				return nil, fmt.Errorf("couldn't unmarshal request: %w", err)
+	// 			}
+	// 		} else {
+	// 			if err := json.Unmarshal(b, req); err != nil {
+	// 				return nil, fmt.Errorf("couldn't unmarshal request: %w", err)
+	// 			}
+	// 		}
+	// 		a.Req = req
+	// 	}
+	// }
+	// b = fieldToBytes(resp.attempts)
+	// if len(b) > 0 {
+	// 	a.Attempts, err = decodeAttempts(b, plug)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("couldn't decode attempts: %w", err)
+	// 	}
+	// }
 	return a, nil
 }

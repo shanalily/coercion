@@ -4,9 +4,8 @@ import (
 	"context"
 
 	"github.com/element-of-surprise/coercion/internal/private"
-	// "zombiezen.com/go/cosmosdb/cosmosdbx"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 type closer struct {

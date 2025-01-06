@@ -10,8 +10,8 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	// "os"
+	// "path/filepath"
 	"sync"
 
 	"github.com/element-of-surprise/coercion/internal/private"

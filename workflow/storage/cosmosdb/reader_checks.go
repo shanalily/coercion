@@ -27,32 +27,6 @@ func (p reader) strToCheck(ctx context.Context, strID string) (*workflow.Checks,
 
 // fetchChecksByID fetches a Checks object by its ID.
 func (p reader) fetchChecksByID(ctx context.Context, id uuid.UUID) (*workflow.Checks, error) {
-	// do := func(conn *cosmosdb.Conn) (err error) {
-	// 	err = cosmosdbx.Execute(
-	// 		conn,
-	// 		fetchChecksByID,
-	// 		&cosmosdbx.ExecOptions{
-	// 			Named: map[string]any{
-	// 				"$id": id.String(),
-	// 			},
-	// 			ResultFunc: func(stmt *cosmosdb.Stmt) error {
-	// 				c, err := p.checksRowToChecks(ctx, conn, stmt)
-	// 				if err != nil {
-	// 					return fmt.Errorf("couldn't convert row to checks: %w", err)
-	// 				}
-	// 				check = c
-	// 				return nil
-	// 			},
-	// 		},
-	// 	)
-	// 	if err != nil {
-	// 		return fmt.Errorf("couldn't fetch checks by id: %w", err)
-	// 	}
-	// 	return nil
-	// }
-	// if err := do(conn); err != nil {
-	// 	return nil, fmt.Errorf("couldn't fetch checks by ids: %w", err)
-	// }
 	var itemOpt = &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
 	}

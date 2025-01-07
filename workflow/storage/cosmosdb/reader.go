@@ -38,7 +38,6 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 	}
 
 	key := partitionKey("underlayName")
-	// res, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
 	_, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
 	if err != nil {
 		if IsNotFound(err) {
@@ -61,10 +60,39 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 		return nil, fmt.Errorf("invalid filter: %w", err)
 	}
 
-	// q, args, named := r.buildSearchQuery(filters)
-	_, _, _ = r.buildSearchQuery(filters)
+	q, parameters := r.buildSearchQuery(filters)
 
-	results := make(chan storage.Stream[storage.ListResult], 1)
+	// results := make(chan storage.Stream[storage.ListResult], 1)
+	pk := partitionKey("underlayName")
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, pk, &azcosmos.QueryOptions{QueryParameters: parameters})
+	// results := make(chan storage.Stream[storage.ListResult], 1)
+	resultsStream := make(chan storage.Stream[storage.ListResult])
+	// results := make([]any, 0)
+	results := make([]storage.ListResult, 0)
+	for pager.More() {
+		res, err := pager.NextPage(ctx)
+		if err != nil {
+			resultsStream <- storage.Stream[storage.ListResult]{
+				Err: err,
+			}
+			return resultsStream, err
+		}
+		for _, item := range res.Items {
+			result, err := r.listResultsFunc(item)
+			if err != nil {
+				resultsStream <- storage.Stream[storage.ListResult]{
+					Err: err,
+				}
+				return resultsStream, fmt.Errorf("problem listing plans: %w", err)
+			}
+			results = append(results, result)
+		}
+	}
+
+	// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
+	for _, r := range results {
+		resultsStream <- storage.Stream[storage.ListResult]{Result: r}
+	}
 
 	// go func() {
 	// 	err := cosmosdbx.Execute(
@@ -95,21 +123,16 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 	// 		results <- storage.Stream[storage.ListResult]{Err: fmt.Errorf("couldn't complete list plans: %w", err)}
 	// 	}
 	// }()
-	return results, nil
+	return resultsStream, nil
 }
 
-func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[string]any) {
-	// queryParams := []azcosmos.QueryParameter{
-	// 	{
-	// 		Name:  "id",
-	// 		Value: strings.ToLower(planID),
-	// 	},
-	// }
+func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.QueryParameter) {
+	parameters := []azcosmos.QueryParameter{}
 
 	const sel = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE`
 
-	var named map[string]any
-	var args []any
+	// var named map[string]any
+	// var args []any
 
 	build := strings.Builder{}
 	build.WriteString(sel)
@@ -119,6 +142,7 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[st
 	if len(filters.ByIDs) > 0 {
 		numFilters++
 		build.WriteString(" id IN $ids")
+		// add cosmosdb qeury pareameterZ? or just rely on string replace?
 	}
 	if len(filters.ByGroupIDs) > 0 {
 		if numFilters > 0 {
@@ -134,12 +158,16 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[st
 		numFilters++ // I know this says inEffectual assignment and it is, but it is here for completeness.
 		for i, s := range filters.ByStatus {
 			name := fmt.Sprintf("$status%d", i)
-			named[name] = int64(s)
+			// named[name] = int64(s)
 			if i == 0 {
 				build.WriteString(fmt.Sprintf(" state_status = %s", name))
 			} else {
 				build.WriteString(fmt.Sprintf(" AND state_status = %s", name))
 			}
+			parameters = append(parameters, azcosmos.QueryParameter{
+				Name:  "$status",
+				Value: int64(s),
+			})
 		}
 	}
 	build.WriteString(" ORDER BY submit_time DESC;")
@@ -148,14 +176,22 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[st
 	if len(filters.ByIDs) > 0 {
 		var idArgs []any
 		query, idArgs = replaceWithIDs(query, "$id", filters.ByIDs)
-		args = append(args, idArgs...)
+		// args = append(args, idArgs...)
+		parameters = append(parameters, azcosmos.QueryParameter{
+			Name:  "$ids",
+			Value: idArgs,
+		})
 	}
 	if len(filters.ByGroupIDs) > 0 {
 		var groupArgs []any
 		query, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
-		args = append(args, groupArgs...)
+		// args = append(args, groupArgs...)
+		parameters = append(parameters, azcosmos.QueryParameter{
+			Name:  "$group_ids",
+			Value: groupArgs,
+		})
 	}
-	return query, args, named
+	return query, parameters // args, named
 }
 
 // List returns a list of Plan IDs in the storage in order from newest to oldest. This should

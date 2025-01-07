@@ -31,34 +31,17 @@ func (p reader) strToSequences(ctx context.Context, sequenceIDs string) ([]*work
 
 // fetchSequenceByID fetches a sequence by its id.
 func (p reader) fetchSequenceByID(ctx context.Context, id uuid.UUID) (*workflow.Sequence, error) {
-	sequence := &workflow.Sequence{}
-	// do := func(conn *cosmosdb.Conn) (err error) {
-	// 	err = cosmosdbx.Execute(
-	// 		conn,
-	// 		fetchSequencesByID,
-	// 		&cosmosdbx.ExecOptions{
-	// 			Named: map[string]interface{}{
-	// 				"$id": id.String(),
-	// 			},
-	// 			ResultFunc: func(stmt *cosmosdb.Stmt) error {
-	// 				sequence, err = p.sequenceRowToSequence(ctx, conn, stmt)
-	// 				if err != nil {
-	// 					return fmt.Errorf("couldn't convert row to sequence: %w", err)
-	// 				}
-	// 				return nil
-	// 			},
-	// 		},
-	// 	)
-	// 	if err != nil {
-	// 		return fmt.Errorf("couldn't fetch sequence by id: %w", err)
-	// 	}
-	// 	return nil
-	// }
+	var itemOpt = &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
 
-	// if err := do(conn); err != nil {
-	// 	return nil, fmt.Errorf("couldn't fetch sequence by id: %w", err)
-	// }
-	return sequence, nil
+	key := partitionKey("underlayName")
+	res, err := p.cc.GetSequencesClient().ReadItem(ctx, key, id.String(), itemOpt)
+	if err != nil {
+		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
+		return nil, fmt.Errorf("couldn't fetch sequence by id: %w", err)
+	}
+	return p.sequenceRowToSequence(ctx, &res)
 }
 
 // sequenceRowToSequence converts a cosmosdb row to a workflow.Sequence.

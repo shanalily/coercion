@@ -33,8 +33,6 @@ func IsNotFound(err error) bool {
 
 // Exists returns true if the Plan ID exists in the storage.
 func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
-	const q = "SELECT COUNT(*) FROM 'plans' WHERE 'id' = ?;"
-
 	var itemOpt = &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
 	}
@@ -49,28 +47,6 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
 		return false, fmt.Errorf("couldn't fetch block by id: %w", err)
 	}
-
-	// count := -1
-	// err = cosmosdbx.ExecuteTransient(
-	// 	conn,
-	// 	q,
-	// 	&cosmosdbx.ExecOptions{
-	// 		Args: []any{
-	// 			id[:],
-	// 		},
-	// 		ResultFunc: func(stmt *cosmosdb.Stmt) error {
-	// 			count = stmt.ColumnInt(0)
-	// 			return nil
-	// 		},
-	// 	},
-	// )
-	// if err != nil {
-	// 	return false, fmt.Errorf("couldn't do a lookup in table plans: %w", err)
-	// }
-	// if count < 0 {
-	// 	return false, fmt.Errorf("bug: unexpected count value: %d", count)
-	// }
-	// return count > 0, nil
 	return true, nil
 }
 
@@ -123,6 +99,13 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 }
 
 func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[string]any) {
+	// queryParams := []azcosmos.QueryParameter{
+	// 	{
+	// 		Name:  "id",
+	// 		Value: strings.ToLower(planID),
+	// 	},
+	// }
+
 	const sel = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE`
 
 	var named map[string]any
@@ -179,13 +162,8 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []any, map[st
 // return with most recent submiited first. Limit sets the maximum number of
 // entrie to return
 func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storage.ListResult], error) {
+	// list all plans without parameters
 	const listPlans = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans ORDER BY submit_time DESC`
-
-	// conn, err := r.pool.Take(ctx)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("couldn't get a connection from the pool: %w", err)
-	// }
-	// defer r.pool.Put(conn)
 
 	named := map[string]any{}
 
@@ -195,41 +173,98 @@ func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storag
 		named["$limit"] = limit
 	}
 
-	results := make(chan storage.Stream[storage.ListResult], 1)
+	pk := partitionKey("underlayName")
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, pk, &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
+	// results := make(chan storage.Stream[storage.ListResult], 1)
+	resultsStream := make(chan storage.Stream[storage.ListResult])
+	// results := make([]any, 0)
+	results := make([]storage.ListResult, 0)
+	for pager.More() {
+		res, err := pager.NextPage(ctx)
+		if err != nil {
+			resultsStream <- storage.Stream[storage.ListResult]{
+				Err: err,
+			}
+			return resultsStream, err
+		}
+		for _, item := range res.Items {
+			result, err := r.listResultsFunc(item)
+			if err != nil {
+				resultsStream <- storage.Stream[storage.ListResult]{
+					Err: err,
+				}
+				return resultsStream, fmt.Errorf("problem listing plans: %w", err)
+			}
+			results = append(results, result)
+		}
+	}
 
+	// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
+	for _, r := range results {
+		resultsStream <- storage.Stream[storage.ListResult]{Result: r}
+	}
+
+	// results := make(chan storage.Stream[storage.ListResult], 1)
 	// go func() {
-	// 	err := cosmosdbx.Execute(
-	// 		conn,
-	// 		q,
-	// 		&cosmosdbx.ExecOptions{
-	// 			Named: named,
-	// 			ResultFunc: func(stmt *cosmosdb.Stmt) error {
-	// 				result, err := r.listResultsFunc(stmt)
-	// 				if err != nil {
-	// 					return fmt.Errorf("problem listing plans: %w", err)
-	// 				}
-	// 				select {
-	// 				case <-ctx.Done():
-	// 					results <- storage.Stream[storage.ListResult]{
-	// 						Err: ctx.Err(),
-	// 					}
-	// 					return ctx.Err()
-	// 				case results <- storage.Stream[storage.ListResult]{Result: result}:
-	// 					return nil
-	// 				}
-	// 			},
-	// 		},
-	// 	)
+	// 		result, err := r.listResultsFunc(stmt)
+	// 		if err != nil {
+	// 			return fmt.Errorf("problem listing plans: %w", err)
+	// 		}
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			results <- storage.Stream[storage.ListResult]{
+	// 				Err: ctx.Err(),
+	// 			}
+	// 			return ctx.Err()
+	// 		case results <- storage.Stream[storage.ListResult]{Result: result}:
+	// 			return nil
+	// 		}
 
 	// 	if err != nil {
 	// 		results <- storage.Stream[storage.ListResult]{Err: fmt.Errorf("couldn't complete list plans: %w", err)}
 	// 	}
 	// }()
-	return results, nil
+	return resultsStream, nil
+}
+
+// listResultsFunc is a helper function to convert a SQLite statement into a ListResult.
+func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
+	// still need to iterate through items here: response has Items of type [][]byte
+	var err error
+	var resp plansEntry
+	err = json.Unmarshal(item, &resp)
+	if err != nil {
+		return storage.ListResult{}, err
+	}
+
+	result := storage.ListResult{}
+	result.ID, err = uuid.Parse(resp.id)
+	if err != nil {
+		return result, fmt.Errorf("couldn't convert ID to UUID: %w", err)
+	}
+	gid := resp.groupID
+	if gid == "" {
+		result.GroupID = uuid.Nil
+	} else {
+		result.GroupID, err = uuid.Parse(resp.groupID)
+		if err != nil {
+			return result, fmt.Errorf("couldn't convert GroupID to UUID: %w", err)
+		}
+	}
+	result.Name = resp.name
+	result.Descr = resp.descr
+	result.SubmitTime = time.Unix(0, resp.submitTime)
+	result.State = &workflow.State{
+		Status: workflow.Status(resp.stateStatus),
+		Start:  time.Unix(0, resp.stateStart),
+		End:    time.Unix(0, resp.stateEnd),
+	}
+	return result, nil
 }
 
 // // listResultsFunc is a helper function to convert a SQLite statement into a ListResult.
-// func (r reader) listResultsFunc(stmt *cosmosdb.Stmt) (storage.ListResult, error) {
+// func (r reader) listResultsFunc(resp azcosmos.QueryItemsResponse) (storage.ListResult, error) {
+// 	// still need to iterate through items here: response has Items of type [][]byte
 // 	result := storage.ListResult{}
 // 	var err error
 // 	result.ID, err = fieldToID("id", stmt)

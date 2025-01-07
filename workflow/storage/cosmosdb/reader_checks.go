@@ -27,7 +27,6 @@ func (p reader) strToCheck(ctx context.Context, strID string) (*workflow.Checks,
 
 // fetchChecksByID fetches a Checks object by its ID.
 func (p reader) fetchChecksByID(ctx context.Context, id uuid.UUID) (*workflow.Checks, error) {
-	var check *workflow.Checks
 	// do := func(conn *cosmosdb.Conn) (err error) {
 	// 	err = cosmosdbx.Execute(
 	// 		conn,
@@ -54,6 +53,20 @@ func (p reader) fetchChecksByID(ctx context.Context, id uuid.UUID) (*workflow.Ch
 	// if err := do(conn); err != nil {
 	// 	return nil, fmt.Errorf("couldn't fetch checks by ids: %w", err)
 	// }
+	var itemOpt = &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+
+	key := partitionKey("underlayName")
+	res, err := p.cc.GetChecksClient().ReadItem(ctx, key, id.String(), itemOpt)
+	if err != nil {
+		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
+		return nil, fmt.Errorf("couldn't fetch checks by id: %w", err)
+	}
+	check, err := p.checksRowToChecks(ctx, &res)
+	if err != nil {
+		return nil, err
+	}
 	if check == nil {
 		return nil, fmt.Errorf("couldn't find checks by id(%s)", id)
 	}
@@ -85,10 +98,10 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: %w", err)
 	}
-	// c.Actions, err = p.strToActions(ctx, conn, stmt)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("couldn't get actions ids: %w", err)
-	// }
+	c.Actions, err = p.strToActions(ctx, resp.actions)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get actions ids: %w", err)
+	}
 
 	return c, nil
 }

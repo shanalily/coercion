@@ -276,18 +276,12 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 	}
 
 	result := storage.ListResult{}
-	result.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return result, fmt.Errorf("couldn't convert ID to UUID: %w", err)
-	}
+	result.ID = resp.ID
 	gid := resp.GroupID
-	if gid == "" {
+	if gid == uuid.Nil {
 		result.GroupID = uuid.Nil
 	} else {
-		result.GroupID, err = uuid.Parse(resp.GroupID)
-		if err != nil {
-			return result, fmt.Errorf("couldn't convert GroupID to UUID: %w", err)
-		}
+		result.GroupID = resp.GroupID
 	}
 	result.Name = resp.Name
 	result.Descr = resp.Descr

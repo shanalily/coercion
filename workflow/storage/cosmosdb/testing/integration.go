@@ -58,33 +58,58 @@ func main() {
 	if err != nil {
 		fatalErr(logger, "Failed to create plan ID: %v", err)
 	}
+	checksID, err := uuid.NewV7()
+	if err != nil {
+		fatalErr(logger, "Failed to create checks ID: %v", err)
+	}
+	blockID, err := uuid.NewV7()
+	if err != nil {
+		fatalErr(logger, "Failed to create block ID: %v", err)
+	}
+	seqID, err := uuid.NewV7()
+	if err != nil {
+		fatalErr(logger, "Failed to create sequence ID: %v", err)
+	}
+	actionID, err := uuid.NewV7()
+	if err != nil {
+		fatalErr(logger, "Failed to create action ID: %v", err)
+	}
 
 	plan := &workflow.Plan{
-		ID:        planID,
-		Name:      "plan name",
-		Descr:     "plan descr",
-		PreChecks: &workflow.Checks{},
+		ID:    planID,
+		Name:  "plan name",
+		Descr: "plan descr",
+		PreChecks: &workflow.Checks{
+			ID: checksID,
+		},
 		Blocks: []*workflow.Block{
 			{
+				ID:    blockID,
 				Name:  "block name",
 				Descr: "block descr",
 				Sequences: []*workflow.Sequence{
 					{
+						ID:    seqID,
 						Name:  "sequence name",
 						Descr: "sequence descr",
 						Actions: []*workflow.Action{
 							{
+								ID:      actionID,
 								Name:    "action name",
 								Descr:   "action descr",
 								Plugin:  "plugin/name",
 								Timeout: 15 * time.Minute,
 								Retries: 3,
+								State:   &workflow.State{},
 							},
 						},
+						State: &workflow.State{},
 					},
 				},
+				State: &workflow.State{},
 			},
 		},
+		State: &workflow.State{},
 	}
 
 	if err := vault.Create(ctx, plan); err != nil {

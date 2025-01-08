@@ -12,14 +12,9 @@ import (
 )
 
 // fieldToSequences converts the "sequences" field in a cosmosdb row to a list of workflow.Sequences.
-func (p reader) strToSequences(ctx context.Context, sequenceIDs string) ([]*workflow.Sequence, error) {
-	ids, err := strToIDs(sequenceIDs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read plan sequence ids: %w", err)
-	}
-
-	sequences := make([]*workflow.Sequence, 0, len(ids))
-	for _, id := range ids {
+func (p reader) strToSequences(ctx context.Context, sequenceIDs []uuid.UUID) ([]*workflow.Sequence, error) {
+	sequences := make([]*workflow.Sequence, 0, len(sequenceIDs))
+	for _, id := range sequenceIDs {
 		sequence, err := p.fetchSequenceByID(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't fetch sequence(%s)by id: %w", id, err)
@@ -53,16 +48,10 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 	}
 
 	s := &workflow.Sequence{}
-	s.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse sequence id: %w", err)
-	}
+	s.ID = resp.ID
 	k := resp.Key
-	if k != "" {
-		s.Key, err = uuid.Parse(k)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse sequence key: %w", err)
-		}
+	if k != uuid.Nil {
+		s.Key = k
 	}
 	s.Name = resp.Name
 	s.Descr = resp.Descr

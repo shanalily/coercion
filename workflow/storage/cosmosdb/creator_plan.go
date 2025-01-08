@@ -45,8 +45,8 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 
 	plan := plansEntry{
 		PartitionKey: u.cc.GetPKString(),
-		ID:           p.ID.String(),
-		GroupID:      p.GroupID.String(),
+		ID:           p.ID,
+		GroupID:      p.GroupID,
 		Name:         p.Name,
 		Descr:        p.Descr,
 		// meta: p.Meta,
@@ -58,26 +58,26 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 
 	// stmt.SetBytes("$meta", p.Meta)
 	if p.BypassChecks != nil {
-		plan.BypassChecks = p.BypassChecks.ID.String()
+		plan.BypassChecks = p.BypassChecks.ID
 	}
 	if p.PreChecks != nil {
-		plan.PreChecks = p.PreChecks.ID.String()
+		plan.PreChecks = p.PreChecks.ID
 	}
 	if p.PostChecks != nil {
-		plan.PostChecks = p.PostChecks.ID.String()
+		plan.PostChecks = p.PostChecks.ID
 	}
 	if p.ContChecks != nil {
-		plan.ContChecks = p.ContChecks.ID.String()
+		plan.ContChecks = p.ContChecks.ID
 	}
 	if p.DeferredChecks != nil {
-		plan.DeferredChecks = p.DeferredChecks.ID.String()
+		plan.DeferredChecks = p.DeferredChecks.ID
 	}
 
-	blocks, err := idsToJSON(p.Blocks)
+	blocks, err := objsToIDs(p.Blocks)
 	if err != nil {
-		return fmt.Errorf("planToSQL(idsToJSON(blocks)): %w", err)
+		return fmt.Errorf("planToSQL(idsToStringSlice(blocks)): %w", err)
 	}
-	plan.Blocks = string(blocks)
+	plan.Blocks = blocks
 	if p.SubmitTime.Before(zeroTime) {
 		plan.SubmitTime = zeroTime.UnixNano()
 	} else {
@@ -141,17 +141,17 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 		return nil
 	}
 
-	actions, err := idsToJSON(c.Actions)
+	actions, err := objsToIDs(c.Actions)
 	if err != nil {
-		return fmt.Errorf("idsToJSON(checks.Actions): %w", err)
+		return fmt.Errorf("objsToIDs(checks.Actions): %w", err)
 	}
 	checks := checksEntry{
 		PartitionKey: u.cc.GetPKString(),
-		ID:           c.ID.String(),
-		Key:          c.Key.String(),
-		PlanID:       planID.String(),
+		ID:           c.ID,
+		Key:          c.Key,
+		PlanID:       planID,
 		// meta: p.Meta,
-		Actions: string(actions),
+		Actions: actions,
 	}
 
 	// stmt.SetInt64("$delay", int64(checks.Delay))
@@ -208,9 +208,9 @@ const insertBlock = `
 func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *workflow.Block) error {
 	block := blocksEntry{
 		PartitionKey:      u.cc.GetPKString(),
-		ID:                b.ID.String(),
-		Key:               b.Key.String(),
-		PlanID:            planID.String(),
+		ID:                b.ID,
+		Key:               b.Key,
+		PlanID:            planID,
 		Name:              b.Name,
 		Descr:             b.Descr,
 		Pos:               int64(pos),
@@ -230,27 +230,27 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 		}
 	}
 
-	sequences, err := idsToJSON(b.Sequences)
+	sequences, err := objsToIDs(b.Sequences)
 	if err != nil {
-		return fmt.Errorf("idsToJSON(sequences): %w", err)
+		return fmt.Errorf("objsToIDs(sequences): %w", err)
 	}
 
 	if b.BypassChecks != nil {
-		block.BypassChecks = b.BypassChecks.ID.String()
+		block.BypassChecks = b.BypassChecks.ID
 	}
 	if b.PreChecks != nil {
-		block.PreChecks = b.PreChecks.ID.String()
+		block.PreChecks = b.PreChecks.ID
 	}
 	if b.PostChecks != nil {
-		block.PostChecks = b.PostChecks.ID.String()
+		block.PostChecks = b.PostChecks.ID
 	}
 	if b.ContChecks != nil {
-		block.ContChecks = b.ContChecks.ID.String()
+		block.ContChecks = b.ContChecks.ID
 	}
 	if b.DeferredChecks != nil {
-		block.DeferredChecks = b.DeferredChecks.ID.String()
+		block.DeferredChecks = b.DeferredChecks.ID
 	}
-	block.Sequences = string(sequences)
+	block.Sequences = sequences
 
 	for i, seq := range b.Sequences {
 		if err := u.commitSequence(ctx, planID, i, seq); err != nil {
@@ -289,20 +289,20 @@ const insertSequence = `
 	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $actions, $state_status, $state_start, $state_end)`
 
 func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
-	actions, err := idsToJSON(seq.Actions)
+	actions, err := objsToIDs(seq.Actions)
 	if err != nil {
-		return fmt.Errorf("idsToJSON(actions): %w", err)
+		return fmt.Errorf("objsToIDs(actions): %w", err)
 	}
 
 	sequence := sequencesEntry{
 		PartitionKey: u.cc.GetPKString(),
-		ID:           seq.ID.String(),
-		Key:          seq.Key.String(),
-		PlanID:       planID.String(),
+		ID:           seq.ID,
+		Key:          seq.Key,
+		PlanID:       planID,
 		Name:         seq.Name,
 		Descr:        seq.Descr,
 		Pos:          int64(pos),
-		Actions:      string(actions),
+		Actions:      actions,
 		StateStatus:  int64(seq.State.Status),
 		StateStart:   seq.State.Start.UnixNano(),
 		StateEnd:     seq.State.End.UnixNano(),
@@ -367,9 +367,9 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 	// }
 	action := actionsEntry{
 		PartitionKey: u.cc.GetPKString(),
-		ID:           a.ID.String(),
-		Key:          a.Key.String(),
-		PlanID:       planID.String(),
+		ID:           a.ID,
+		Key:          a.Key,
+		PlanID:       planID,
 		Name:         a.Name,
 		Descr:        a.Descr,
 		Pos:          int64(pos),
@@ -465,4 +465,17 @@ func idsToJSON[T any](objs []T) ([]byte, error) {
 		}
 	}
 	return json.Marshal(ids)
+}
+
+func objsToIDs[T any](objs []T) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, 0, len(objs))
+	for _, o := range objs {
+		if ider, ok := any(o).(ider); ok {
+			id := ider.GetID()
+			ids = append(ids, id)
+		} else {
+			return nil, fmt.Errorf("objsToIDs: object %T does not implement ider", o)
+		}
+	}
+	return ids, nil
 }

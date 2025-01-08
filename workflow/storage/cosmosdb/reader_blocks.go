@@ -13,12 +13,7 @@ import (
 )
 
 // fieldToBlocks converts the "$blocks" field in a cosmosdb row to a list of workflow.Blocks.
-func (p reader) strToBlocks(ctx context.Context, blockIDs string) ([]*workflow.Block, error) {
-	ids, err := strToIDs(blockIDs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read plan block ids: %w", err)
-	}
-
+func (p reader) strToBlocks(ctx context.Context, blockIDs []uuid.UUID) ([]*workflow.Block, error) {
 	// opt := azcosmos.QueryOptions{
 	// 	QueryParameters: []azcosmos.QueryParameter{
 	// 		{"@value", "2"},
@@ -38,8 +33,8 @@ func (p reader) strToBlocks(ctx context.Context, blockIDs string) ([]*workflow.B
 	// 	}
 	// }
 
-	blocks := make([]*workflow.Block, 0, len(ids))
-	for _, id := range ids {
+	blocks := make([]*workflow.Block, 0, len(blockIDs))
+	for _, id := range blockIDs {
 		block, err := p.fetchBlockByID(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't fetch block(%s)by id: %w", id, err)
@@ -77,17 +72,10 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 		return nil, err
 	}
 
-	b.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't convert ID to UUID: %w", err)
-	}
-
+	b.ID = resp.ID
 	k := resp.Key
-	if k != "" {
-		b.Key, err = uuid.Parse(k)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse block key: %w", err)
-		}
+	if k != uuid.Nil {
+		b.Key = k
 	}
 	b.Name = resp.Name
 	b.Descr = resp.Descr

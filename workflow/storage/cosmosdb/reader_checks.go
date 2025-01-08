@@ -14,13 +14,9 @@ import (
 
 // strToCheck reads a field from the statement and returns a workflow.Checks  object. stmt must be
 // from a Plan or Block query.
-func (p reader) strToCheck(ctx context.Context, strID string) (*workflow.Checks, error) {
-	if strID == "" {
-		return nil, nil
-	}
-	id, err := uuid.Parse(strID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't convert ID to UUID: %w", err)
+func (p reader) strToCheck(ctx context.Context, id uuid.UUID) (*workflow.Checks, error) {
+	if id == uuid.Nil {
+		return &workflow.Checks{}, nil
 	}
 	return p.fetchChecksByID(ctx, id)
 }
@@ -51,20 +47,14 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	var resp checksEntry
 	err = json.Unmarshal(response.Value, &resp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal check: %w", err)
 	}
 
 	c := &workflow.Checks{}
-	c.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("checksRowToChecks: couldn't convert ID to UUID: %w", err)
-	}
+	c.ID = resp.ID
 	k := resp.Key
-	if k != "" {
-		c.Key, err = uuid.Parse(k)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse check key: %w", err)
-		}
+	if k != uuid.Nil {
+		c.Key = k
 	}
 	c.Delay = time.Duration(resp.Delay)
 	c.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)

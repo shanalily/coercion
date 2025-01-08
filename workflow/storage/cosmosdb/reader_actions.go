@@ -14,13 +14,8 @@ import (
 )
 
 // fieldToActions converts the "actions" field in a cosmosdb row to a list of workflow.Actions.
-func (r reader) strToActions(ctx context.Context, actionIDs string) ([]*workflow.Action, error) {
-	ids, err := strToIDs(actionIDs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read action ids: %w", err)
-	}
-
-	actions, err := r.fetchActionsByIDs(ctx, ids)
+func (r reader) strToActions(ctx context.Context, actionIDs []uuid.UUID) ([]*workflow.Action, error) {
+	actions, err := r.fetchActionsByIDs(ctx, actionIDs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch actions by ids: %w", err)
 	}
@@ -71,16 +66,10 @@ func (r reader) actionRowToAction(ctx context.Context, response *azcosmos.ItemRe
 	}
 
 	a := &workflow.Action{}
-	a.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse action id: %w", err)
-	}
+	a.ID = resp.ID
 	k := resp.Key
-	if k != "" {
-		a.Key, err = uuid.Parse(k)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse action key: %w", err)
-		}
+	if k != uuid.Nil {
+		a.Key = k
 	}
 	a.Name = resp.Name
 	a.Descr = resp.Descr

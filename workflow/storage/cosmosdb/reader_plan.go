@@ -38,18 +38,12 @@ func (p reader) convertToPlan(ctx context.Context, response *azcosmos.ItemRespon
 	}
 
 	plan := &workflow.Plan{}
-	plan.ID, err = uuid.Parse(resp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't convert ID to UUID: %w", err)
-	}
+	plan.ID = resp.ID
 	gid := resp.GroupID
-	if gid == "" {
+	if gid == uuid.Nil {
 		plan.GroupID = uuid.Nil
 	} else {
-		plan.GroupID, err = uuid.Parse(resp.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't convert GroupID to UUID: %w", err)
-		}
+		plan.GroupID = resp.GroupID
 	}
 	plan.Name = resp.Name
 	plan.Descr = resp.Descr
@@ -89,5 +83,6 @@ func (p reader) convertToPlan(ctx context.Context, response *azcosmos.ItemRespon
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get blocks: %w", err)
 	}
+	// plan.Blocks = resp.Blocks
 	return plan, nil
 }

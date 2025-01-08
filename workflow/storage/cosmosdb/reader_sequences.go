@@ -53,24 +53,24 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 	}
 
 	s := &workflow.Sequence{}
-	s.ID, err = uuid.Parse(resp.id)
+	s.ID, err = uuid.Parse(resp.ID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse sequence id: %w", err)
 	}
-	k := resp.key
+	k := resp.Key
 	if k != "" {
 		s.Key, err = uuid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse sequence key: %w", err)
 		}
 	}
-	s.Name = resp.name
-	s.Descr = resp.descr
-	s.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
+	s.Name = resp.Name
+	s.Descr = resp.Descr
+	s.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get sequence state: %w", err)
 	}
-	s.Actions, err = p.strToActions(ctx, resp.actions)
+	s.Actions, err = p.strToActions(ctx, resp.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read sequence actions: %w", err)
 	}

@@ -49,25 +49,26 @@ CREATE Table If Not Exists plans (
 );`
 
 type blocksEntry struct {
-	id                string `json:"id,omitempty"`
-	planID            string `json:"planID,omitempty"`
-	key               string `json:"key,omitempty"`
-	name              string `json:"name,omitempty"`
-	descr             string `json:"descr,omitempty"`
-	pos               int64  `json:"pos,omitempty"`
-	entranceDelay     int64  `json:"entranceDelay,omitempty"`
-	exitDelay         int64  `json:"exitDelay,omitempty"`
-	bypassChecks      string `json:"bypassChecks,omitempty"`
-	preChecks         string `json:"preChecks,omitempty"`
-	postChecks        string `json:"postChecks,omitempty"`
-	contChecks        string `json:"contChecks,omitempty"`
-	deferredChecks    string `json:"deferredChecks,omitempty"`
-	sequences         string `json:"sequences,omitempty"`
-	concurrency       int64  `json:"concurrency,omitempty"`
-	toleratedFailures int64  `json:"toleratedFailures,omitempty"`
-	stateStatus       int64  `json:"stateStatus,omitempty"`
-	stateStart        int64  `json:"stateStart,omitempty"`
-	stateEnd          int64  `json:"stateEnd,omitempty"`
+	PartitionKey      string `json:"partitionKey,omitempty"`
+	ID                string `json:"id,omitempty"`
+	PlanID            string `json:"planID,omitempty"`
+	Key               string `json:"key,omitempty"`
+	Name              string `json:"name,omitempty"`
+	Descr             string `json:"descr,omitempty"`
+	Pos               int64  `json:"pos,omitempty"`
+	EntranceDelay     int64  `json:"entranceDelay,omitempty"`
+	ExitDelay         int64  `json:"exitDelay,omitempty"`
+	BypassChecks      string `json:"bypassChecks,omitempty"`
+	PreChecks         string `json:"preChecks,omitempty"`
+	PostChecks        string `json:"postChecks,omitempty"`
+	ContChecks        string `json:"contChecks,omitempty"`
+	DeferredChecks    string `json:"deferredChecks,omitempty"`
+	Sequences         string `json:"sequences,omitempty"`
+	Concurrency       int64  `json:"concurrency,omitempty"`
+	ToleratedFailures int64  `json:"toleratedFailures,omitempty"`
+	StateStatus       int64  `json:"stateStatus,omitempty"`
+	StateStart        int64  `json:"stateStart,omitempty"`
+	StateEnd          int64  `json:"stateEnd,omitempty"`
 }
 
 var blocksSchema = `
@@ -94,14 +95,15 @@ CREATE Table If Not Exists blocks (
 );`
 
 type checksEntry struct {
-	id          string `json:"id,omitempty"`
-	key         string `json:"key,omitempty"`
-	planID      string `json:"planID,omitempty"`
-	actions     string `json:"actions,omitempty"`
-	delay       int64  `json:"delay,omitempty"`
-	stateStatus int64  `json:"stateStatus,omitempty"`
-	stateStart  int64  `json:"stateStart,omitempty"`
-	stateEnd    int64  `json:"stateEnd,omitempty"`
+	PartitionKey string `json:"partitionKey,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Key          string `json:"key,omitempty"`
+	PlanID       string `json:"planID,omitempty"`
+	Actions      string `json:"actions,omitempty"`
+	Delay        int64  `json:"delay,omitempty"`
+	StateStatus  int64  `json:"stateStatus,omitempty"`
+	StateStart   int64  `json:"stateStart,omitempty"`
+	StateEnd     int64  `json:"stateEnd,omitempty"`
 }
 
 var checksSchema = `
@@ -117,16 +119,17 @@ CREATE Table If Not Exists checks (
 );`
 
 type sequencesEntry struct {
-	id          string `json:"id,omitempty"`
-	key         string `json:"key,omitempty"`
-	planID      string `json:"planID,omitempty"`
-	name        string `json:"name,omitempty"`
-	descr       string `json:"descr,omitempty"`
-	pos         int64  `json:"pos,omitempty"`
-	actions     string `json:"actions,omitempty"`
-	stateStatus int64  `json:"stateStatus,omitempty"`
-	stateStart  int64  `json:"stateStart,omitempty"`
-	stateEnd    int64  `json:"stateEnd,omitempty"`
+	PartitionKey string `json:"partitionKey,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Key          string `json:"key,omitempty"`
+	PlanID       string `json:"planID,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Descr        string `json:"descr,omitempty"`
+	Pos          int64  `json:"pos,omitempty"`
+	Actions      string `json:"actions,omitempty"`
+	StateStatus  int64  `json:"stateStatus,omitempty"`
+	StateStart   int64  `json:"stateStart,omitempty"`
+	StateEnd     int64  `json:"stateEnd,omitempty"`
 }
 
 var sequencesSchema = `
@@ -144,20 +147,21 @@ CREATE Table If Not Exists sequences (
 );`
 
 type actionsEntry struct {
-	id          string `json:"id,omitempty"`
-	key         string `json:"key,omitempty"`
-	planID      string `json:"planID,omitempty"`
-	name        string `json:"name,omitempty"`
-	descr       string `json:"descr,omitempty"`
-	pos         int64  `json:"pos,omitempty"`
-	plugin      string `json:"plugin,omitempty"`
-	timeout     int64  `json:"timeout,omitempty"`
-	retries     int64  `json:"retries,omitempty"`
-	req         string `json:"req,omitempty"`
-	attempts    int64  `json:"attempts,omitempty"`
-	stateStatus int64  `json:"stateStatus,omitempty"`
-	stateStart  int64  `json:"stateStart,omitempty"`
-	stateEnd    int64  `json:"stateEnd,omitempty"`
+	PartitionKey string `json:"partitionKey,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Key          string `json:"key,omitempty"`
+	PlanID       string `json:"planID,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Descr        string `json:"descr,omitempty"`
+	Pos          int64  `json:"pos,omitempty"`
+	Plugin       string `json:"plugin,omitempty"`
+	Timeout      int64  `json:"timeout,omitempty"`
+	Retries      int64  `json:"retries,omitempty"`
+	Req          string `json:"req,omitempty"`
+	Attempts     int64  `json:"attempts,omitempty"`
+	StateStatus  int64  `json:"stateStatus,omitempty"`
+	StateStart   int64  `json:"stateStart,omitempty"`
+	StateEnd     int64  `json:"stateEnd,omitempty"`
 }
 
 var actionsSchema = `

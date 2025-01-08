@@ -77,49 +77,49 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 		return nil, err
 	}
 
-	b.ID, err = uuid.Parse(resp.id)
+	b.ID, err = uuid.Parse(resp.ID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't convert ID to UUID: %w", err)
 	}
 
-	k := resp.key
+	k := resp.Key
 	if k != "" {
 		b.Key, err = uuid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse block key: %w", err)
 		}
 	}
-	b.Name = resp.name
-	b.Descr = resp.descr
-	b.EntranceDelay = time.Duration(resp.entranceDelay)
-	b.ExitDelay = time.Duration(resp.exitDelay)
-	b.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
+	b.Name = resp.Name
+	b.Descr = resp.Descr
+	b.EntranceDelay = time.Duration(resp.EntranceDelay)
+	b.ExitDelay = time.Duration(resp.ExitDelay)
+	b.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
 	if err != nil {
 		return nil, fmt.Errorf("blockRowToBlock: %w", err)
 	}
-	b.Concurrency = int(resp.concurrency)
-	b.ToleratedFailures = int(resp.toleratedFailures)
-	b.BypassChecks, err = p.strToCheck(ctx, resp.bypassChecks)
+	b.Concurrency = int(resp.Concurrency)
+	b.ToleratedFailures = int(resp.ToleratedFailures)
+	b.BypassChecks, err = p.strToCheck(ctx, resp.BypassChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block bypasschecks: %w", err)
 	}
-	b.PreChecks, err = p.strToCheck(ctx, resp.preChecks)
+	b.PreChecks, err = p.strToCheck(ctx, resp.PreChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block prechecks: %w", err)
 	}
-	b.ContChecks, err = p.strToCheck(ctx, resp.contChecks)
+	b.ContChecks, err = p.strToCheck(ctx, resp.ContChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block contchecks: %w", err)
 	}
-	b.PostChecks, err = p.strToCheck(ctx, resp.postChecks)
+	b.PostChecks, err = p.strToCheck(ctx, resp.PostChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block postchecks: %w", err)
 	}
-	b.DeferredChecks, err = p.strToCheck(ctx, resp.postChecks)
+	b.DeferredChecks, err = p.strToCheck(ctx, resp.PostChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block deferredchecks: %w", err)
 	}
-	b.Sequences, err = p.strToSequences(ctx, resp.sequences)
+	b.Sequences, err = p.strToSequences(ctx, resp.Sequences)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read block sequences: %w", err)
 	}

@@ -87,9 +87,21 @@ func main() {
 		},
 	}
 
-	if err := vault.Create(context.Background(), plan); err != nil {
+	if err := vault.Create(ctx, plan); err != nil {
 		fatalErr(logger, "Failed to create plan entry: %v", err)
 	}
+
+	// results, err := vault.List(context.Background(), 0);
+	// if err != nil {
+	// 	fatalErr(logger, "Failed to list plan entries: %v", err)
+	// }
+	// res := <-results
+	// fmt.Println(res)
+	result, err := vault.Read(ctx, planID)
+	if err != nil {
+		fatalErr(logger, "Failed to read plan entry: %v", err)
+	}
+	fmt.Println(result)
 }
 
 // msiCred returns a managed identity credential.

@@ -50,6 +50,10 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		Name:         p.Name,
 		Descr:        p.Descr,
 		// meta: p.Meta,
+		StateStatus: int64(p.State.Status),
+		StateStart:  p.State.Start.UnixNano(),
+		StateEnd:    p.State.End.UnixNano(),
+		Reason:      int64(p.Reason),
 	}
 
 	// stmt.SetBytes("$meta", p.Meta)
@@ -69,45 +73,37 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		plan.DeferredChecks = p.DeferredChecks.ID.String()
 	}
 
-	// blocks, err := idsToJSON(p.Blocks)
-	// if err != nil {
-	// 	return fmt.Errorf("planToSQL(idsToJSON(blocks)): %w", err)
-	// }
-	// stmt.SetBytes("$blocks", blocks)
-	// stmt.SetInt64("$state_status", int64(p.State.Status))
-	// stmt.SetInt64("$state_start", p.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", p.State.End.UnixNano())
-	// if p.SubmitTime.Before(zeroTime) {
-	// 	stmt.SetInt64("$submit_time", zeroTime.UnixNano())
-	// } else {
-	// 	stmt.SetInt64("$submit_time", p.SubmitTime.UnixNano())
-	// }
-	// stmt.SetInt64("$reason", int64(p.Reason))
+	blocks, err := idsToJSON(p.Blocks)
+	if err != nil {
+		return fmt.Errorf("planToSQL(idsToJSON(blocks)): %w", err)
+	}
+	plan.Blocks = string(blocks)
+	if p.SubmitTime.Before(zeroTime) {
+		plan.SubmitTime = zeroTime.UnixNano()
+	} else {
+		plan.SubmitTime = p.SubmitTime.UnixNano()
+	}
 
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("planToSQL(plan): %w", err)
-	// }
-
-	// if err := commitChecks(ctx,  p.ID, p.BypassChecks); err != nil {
-	// 	return fmt.Errorf("planToSQL(commitChecks(bypasschecks)): %w", err)
-	// }
-	// if err := commitChecks(ctx, p.ID, p.PreChecks); err != nil {
-	// 	return fmt.Errorf("planToSQL(commitChecks(prechecks)): %w", err)
-	// }
-	// if err := commitChecks(ctx, p.ID, p.PostChecks); err != nil {
-	// 	return fmt.Errorf("planToSQL(commitChecks(postchecks)): %w", err)
-	// }
-	// if err := commitChecks(ctx, p.ID, p.ContChecks); err != nil {
-	// 	return fmt.Errorf("planToSQL(commitChecks(contchecks)): %w", err)
-	// }
-	// if err := commitChecks(ctx, p.ID, p.DeferredChecks); err != nil {
-	// 	return fmt.Errorf("planToSQL(commitChecks(deferredchecks)): %w", err)
-	// }
-	// for i, b := range p.Blocks {
-	// 	if err := commitBlock(ctx, p.ID, i, b); err != nil {
-	// 		return fmt.Errorf("planToSQL(commitBlocks): %w", err)
-	// 	}
+	if err := u.commitChecks(ctx, p.ID, p.BypassChecks); err != nil {
+		return fmt.Errorf("planToSQL(commitChecks(bypasschecks)): %w", err)
+	}
+	if err := u.commitChecks(ctx, p.ID, p.PreChecks); err != nil {
+		return fmt.Errorf("planToSQL(commitChecks(prechecks)): %w", err)
+	}
+	if err := u.commitChecks(ctx, p.ID, p.PostChecks); err != nil {
+		return fmt.Errorf("planToSQL(commitChecks(postchecks)): %w", err)
+	}
+	if err := u.commitChecks(ctx, p.ID, p.ContChecks); err != nil {
+		return fmt.Errorf("planToSQL(commitChecks(contchecks)): %w", err)
+	}
+	if err := u.commitChecks(ctx, p.ID, p.DeferredChecks); err != nil {
+		return fmt.Errorf("planToSQL(commitChecks(deferredchecks)): %w", err)
+	}
+	for i, b := range p.Blocks {
+		if err := u.commitBlock(ctx, p.ID, i, b); err != nil {
+			return fmt.Errorf("planToSQL(commitBlocks): %w", err)
+		}
+	}
 
 	// save the JSON format document into Cosmos DB.
 	itemOpt := &azcosmos.ItemOptions{
@@ -123,8 +119,6 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 	fmt.Println(res)
-
-	// }
 
 	return nil
 }
@@ -142,40 +136,47 @@ const insertChecks = `
 	) VALUES ($id, $key, $plan_id, $actions, $delay,
 	$state_status, $state_start, $state_end)`
 
-func commitChecks(ctx context.Context, planID uuid.UUID, checks *workflow.Checks) error {
-	if checks == nil {
+func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow.Checks) error {
+	if c == nil {
 		return nil
 	}
 
-	// stmt, err := conn.Prepare(insertChecks)
-	// if err != nil {
-	// 	return fmt.Errorf("conn.Prepare(insertCheck): %w", err)
-	// }
+	actions, err := idsToJSON(c.Actions)
+	if err != nil {
+		return fmt.Errorf("idsToJSON(checks.Actions): %w", err)
+	}
+	checks := checksEntry{
+		PartitionKey: u.cc.GetPKString(),
+		ID:           c.ID.String(),
+		Key:          c.Key.String(),
+		PlanID:       planID.String(),
+		// meta: p.Meta,
+		Actions: string(actions),
+	}
 
-	// actions, err := idsToJSON(checks.Actions)
-	// if err != nil {
-	// 	return fmt.Errorf("idsToJSON(checks.Actions): %w", err)
-	// }
-
-	// stmt.SetText("$id", checks.ID.String())
-	// stmt.SetText("$key", checks.Key.String())
-	// stmt.SetText("$plan_id", planID.String())
-	// stmt.SetBytes("$actions", actions)
 	// stmt.SetInt64("$delay", int64(checks.Delay))
 	// stmt.SetInt64("$state_status", int64(checks.State.Status))
 	// stmt.SetInt64("$state_start", checks.State.Start.UnixNano())
 	// stmt.SetInt64("$state_end", checks.State.End.UnixNano())
 
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("commitChecks: %w", err)
-	// }
+	for i, a := range c.Actions {
+		if err := u.commitAction(ctx, planID, i, a); err != nil {
+			return fmt.Errorf("commitAction: %w", err)
+		}
+	}
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(checks)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
 
-	// for i, a := range checks.Actions {
-	// 	if err := commitAction(ctx, conn, planID, i, a); err != nil {
-	// 		return fmt.Errorf("commitAction: %w", err)
-	// 	}
-	// }
+	res, err := u.cc.GetChecksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
+	if err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res)
 
 	return nil
 }
@@ -204,63 +205,72 @@ const insertBlock = `
 	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $entrancedelay, $exitdelay, $bypasschecks, $prechecks, $postchecks, $contchecks, $deferredchecks,
 	$sequences, $concurrency, $toleratedfailures,$state_status, $state_start, $state_end)`
 
-func commitBlock(ctx context.Context, planID uuid.UUID, pos int, block *workflow.Block) error {
-	// stmt, err := conn.Prepare(insertBlock)
-	// if err != nil {
-	// 	return fmt.Errorf("conn.Prepate(insertBlock): %w", err)
-	// }
+func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *workflow.Block) error {
+	block := blocksEntry{
+		PartitionKey:      u.cc.GetPKString(),
+		ID:                b.ID.String(),
+		Key:               b.Key.String(),
+		PlanID:            planID.String(),
+		Name:              b.Name,
+		Descr:             b.Descr,
+		Pos:               int64(pos),
+		EntranceDelay:     int64(b.EntranceDelay),
+		ExitDelay:         int64(b.ExitDelay),
+		Concurrency:       int64(b.Concurrency),
+		ToleratedFailures: int64(b.ToleratedFailures),
+		StateStatus:       int64(b.State.Status),
+		StateStart:        b.State.Start.UnixNano(),
+		StateEnd:          b.State.End.UnixNano(),
+		// meta: p.Meta,
+	}
 
-	// for _, c := range [5]*workflow.Checks{block.BypassChecks, block.PreChecks, block.PostChecks, block.ContChecks, block.DeferredChecks} {
-	// 	if err := commitChecks(ctx, conn, planID, c); err != nil {
-	// 		return fmt.Errorf("commitBlock(commitChecks): %w", err)
-	// 	}
-	// }
+	for _, c := range [5]*workflow.Checks{b.BypassChecks, b.PreChecks, b.PostChecks, b.ContChecks, b.DeferredChecks} {
+		if err := u.commitChecks(ctx, planID, c); err != nil {
+			return fmt.Errorf("commitBlock(commitChecks): %w", err)
+		}
+	}
 
-	// sequences, err := idsToJSON(block.Sequences)
-	// if err != nil {
-	// 	return fmt.Errorf("idsToJSON(sequences): %w", err)
-	// }
+	sequences, err := idsToJSON(b.Sequences)
+	if err != nil {
+		return fmt.Errorf("idsToJSON(sequences): %w", err)
+	}
 
-	// stmt.SetText("$id", block.ID.String())
-	// stmt.SetText("$key", block.Key.String())
-	// stmt.SetText("$plan_id", planID.String())
-	// stmt.SetText("$name", block.Name)
-	// stmt.SetText("$descr", block.Descr)
-	// stmt.SetInt64("$pos", int64(pos))
-	// stmt.SetInt64("$entrancedelay", int64(block.EntranceDelay))
-	// stmt.SetInt64("$exitdelay", int64(block.ExitDelay))
-	// if block.BypassChecks != nil {
-	// 	stmt.SetText("$bypasschecks", block.BypassChecks.ID.String())
-	// }
-	// if block.PreChecks != nil {
-	// 	stmt.SetText("$prechecks", block.PreChecks.ID.String())
-	// }
-	// if block.PostChecks != nil {
-	// 	stmt.SetText("$postchecks", block.PostChecks.ID.String())
-	// }
-	// if block.ContChecks != nil {
-	// 	stmt.SetText("$contchecks", block.ContChecks.ID.String())
-	// }
-	// if block.DeferredChecks != nil {
-	// 	stmt.SetText("$deferredchecks", block.DeferredChecks.ID.String())
-	// }
-	// stmt.SetBytes("$sequences", sequences)
-	// stmt.SetInt64("$concurrency", int64(block.Concurrency))
-	// stmt.SetInt64("$toleratedfailures", int64(block.ToleratedFailures))
-	// stmt.SetInt64("$state_status", int64(block.State.Status))
-	// stmt.SetInt64("$state_start", block.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", block.State.End.UnixNano())
+	if b.BypassChecks != nil {
+		block.BypassChecks = b.BypassChecks.ID.String()
+	}
+	if b.PreChecks != nil {
+		block.PreChecks = b.PreChecks.ID.String()
+	}
+	if b.PostChecks != nil {
+		block.PostChecks = b.PostChecks.ID.String()
+	}
+	if b.ContChecks != nil {
+		block.ContChecks = b.ContChecks.ID.String()
+	}
+	if b.DeferredChecks != nil {
+		block.DeferredChecks = b.DeferredChecks.ID.String()
+	}
+	block.Sequences = string(sequences)
 
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return err
-	// }
+	for i, seq := range b.Sequences {
+		if err := u.commitSequence(ctx, planID, i, seq); err != nil {
+			return fmt.Errorf("(commitSequence: %w", err)
+		}
+	}
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(block)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
 
-	// for i, seq := range block.Sequences {
-	// 	if err := commitSequence(ctx, conn, planID, i, seq); err != nil {
-	// 		return fmt.Errorf("(commitSequence: %w", err)
-	// 	}
-	// }
+	res, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
+	if err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res)
+
 	return nil
 }
 
@@ -278,38 +288,46 @@ const insertSequence = `
 		state_end
 	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $actions, $state_status, $state_start, $state_end)`
 
-func commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
-	// stmt, err := conn.Prepare(insertSequence)
-	// if err != nil {
-	// 	return fmt.Errorf("conn.Prepare(insertSequence): %w", err)
-	// }
+func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
+	actions, err := idsToJSON(seq.Actions)
+	if err != nil {
+		return fmt.Errorf("idsToJSON(actions): %w", err)
+	}
 
-	// actions, err := idsToJSON(seq.Actions)
-	// if err != nil {
-	// 	return fmt.Errorf("idsToJSON(actions): %w", err)
-	// }
+	sequence := sequencesEntry{
+		PartitionKey: u.cc.GetPKString(),
+		ID:           seq.ID.String(),
+		Key:          seq.Key.String(),
+		PlanID:       planID.String(),
+		Name:         seq.Name,
+		Descr:        seq.Descr,
+		Pos:          int64(pos),
+		Actions:      string(actions),
+		StateStatus:  int64(seq.State.Status),
+		StateStart:   seq.State.Start.UnixNano(),
+		StateEnd:     seq.State.End.UnixNano(),
+		// meta: p.Meta,
+	}
 
-	// stmt.SetText("$id", seq.ID.String())
-	// stmt.SetText("$key", seq.Key.String())
-	// stmt.SetText("$plan_id", planID.String())
-	// stmt.SetText("$name", seq.Name)
-	// stmt.SetText("$descr", seq.Descr)
-	// stmt.SetInt64("$pos", int64(pos))
-	// stmt.SetBytes("$actions", actions)
-	// stmt.SetInt64("$state_status", int64(seq.State.Status))
-	// stmt.SetInt64("$state_start", seq.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", seq.State.End.UnixNano())
+	for i, a := range seq.Actions {
+		if err := u.commitAction(ctx, planID, i, a); err != nil {
+			return fmt.Errorf("planToSQL(commitAction): %w", err)
+		}
+	}
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(sequence)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
 
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("commitSequence: %w", err)
-	// }
+	res, err := u.cc.GetSequencesClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
+	if err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res)
 
-	// for i, a := range seq.Actions {
-	// 	if err := commitAction(ctx, conn, planID, i, a); err != nil {
-	// 		return fmt.Errorf("planToSQL(commitAction): %w", err)
-	// 	}
-	// }
 	return nil
 }
 
@@ -332,28 +350,37 @@ const insertAction = `
 	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $plugin, $timeout, $retries, $req, $attempts,
 	$state_status, $state_start, $state_end)`
 
-func commitAction(ctx context.Context, planID uuid.UUID, pos int, action *workflow.Action) error {
+func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a *workflow.Action) error {
 	// stmt, err := conn.Prepare(insertAction)
 	// if err != nil {
 	// 	return err
 	// }
 
-	// req, err := json.Marshal(action.Req)
-	// if err != nil {
-	// 	return fmt.Errorf("json.Marshal(req): %w", err)
-	// }
+	req, err := json.Marshal(a.Req)
+	if err != nil {
+		return fmt.Errorf("json.Marshal(req): %w", err)
+	}
 
-	// attempts, err := encodeAttempts(action.Attempts)
+	// attempts, err := encodeAttempts(a.Attempts)
 	// if err != nil {
 	// 	return fmt.Errorf("can't encode action.Attempts: %w", err)
 	// }
+	action := actionsEntry{
+		PartitionKey: u.cc.GetPKString(),
+		ID:           a.ID.String(),
+		Key:          a.Key.String(),
+		PlanID:       planID.String(),
+		Name:         a.Name,
+		Descr:        a.Descr,
+		Pos:          int64(pos),
+		Req:          string(req),
+		// Attempts: string(attempts),
+		StateStatus: int64(a.State.Status),
+		StateStart:  a.State.Start.UnixNano(),
+		StateEnd:    a.State.End.UnixNano(),
+		// meta: p.Meta,
+	}
 
-	// stmt.SetText("$id", action.ID.String())
-	// stmt.SetText("$key", action.Key.String())
-	// stmt.SetText("$plan_id", planID.String())
-	// stmt.SetText("$name", action.Name)
-	// stmt.SetText("$descr", action.Descr)
-	// stmt.SetInt64("$pos", int64(pos))
 	// stmt.SetText("$plugin", action.Plugin)
 	// stmt.SetInt64("$timeout", int64(action.Timeout))
 	// stmt.SetInt64("$retries", int64(action.Retries))
@@ -369,6 +396,20 @@ func commitAction(ctx context.Context, planID uuid.UUID, pos int, action *workfl
 	// if err != nil {
 	// 	return err
 	// }
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(action)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
+
+	res, err := u.cc.GetActionsClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
+	if err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res)
+
 	return nil
 }
 

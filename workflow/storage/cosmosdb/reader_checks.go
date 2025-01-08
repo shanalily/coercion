@@ -55,23 +55,23 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	}
 
 	c := &workflow.Checks{}
-	c.ID, err = uuid.Parse(resp.id)
+	c.ID, err = uuid.Parse(resp.ID)
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: couldn't convert ID to UUID: %w", err)
 	}
-	k := resp.key
+	k := resp.Key
 	if k != "" {
 		c.Key, err = uuid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse check key: %w", err)
 		}
 	}
-	c.Delay = time.Duration(resp.delay)
-	c.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
+	c.Delay = time.Duration(resp.Delay)
+	c.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: %w", err)
 	}
-	c.Actions, err = p.strToActions(ctx, resp.actions)
+	c.Actions, err = p.strToActions(ctx, resp.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get actions ids: %w", err)
 	}

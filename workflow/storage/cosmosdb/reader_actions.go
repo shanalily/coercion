@@ -71,23 +71,23 @@ func (r reader) actionRowToAction(ctx context.Context, response *azcosmos.ItemRe
 	}
 
 	a := &workflow.Action{}
-	a.ID, err = uuid.Parse(resp.id)
+	a.ID, err = uuid.Parse(resp.ID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse action id: %w", err)
 	}
-	k := resp.key
+	k := resp.Key
 	if k != "" {
 		a.Key, err = uuid.Parse(k)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't parse action key: %w", err)
 		}
 	}
-	a.Name = resp.name
-	a.Descr = resp.descr
-	a.Plugin = resp.plugin
-	a.Timeout = time.Duration(resp.timeout)
-	a.Retries = int(resp.retries)
-	a.State, err = fieldToState(resp.stateStatus, resp.stateStart, resp.stateEnd)
+	a.Name = resp.Name
+	a.Descr = resp.Descr
+	a.Plugin = resp.Plugin
+	a.Timeout = time.Duration(resp.Timeout)
+	a.Retries = int(resp.Retries)
+	a.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get action state: %w", err)
 	}

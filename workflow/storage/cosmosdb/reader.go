@@ -31,14 +31,20 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &resErr) && resErr.StatusCode == http.StatusNotFound
 }
 
+// IsNotFound checks if the error indicates there is a resource conflict.
+// Useful to check if a resource already exists in testing.
+func IsConflict(err error) bool {
+	var resErr *azcore.ResponseError
+	return errors.As(err, &resErr) && resErr.StatusCode == http.StatusConflict
+}
+
 // Exists returns true if the Plan ID exists in the storage.
 func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 	var itemOpt = &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
 	}
 
-	key := partitionKey("underlayName")
-	_, err := r.cc.plansClient.ReadItem(ctx, key, id.String(), itemOpt)
+	_, err := r.cc.plansClient.ReadItem(ctx, r.cc.partitionKey, id.String(), itemOpt)
 	if err != nil {
 		if IsNotFound(err) {
 			return false, nil
@@ -63,8 +69,7 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 	q, parameters := r.buildSearchQuery(filters)
 
 	// results := make(chan storage.Stream[storage.ListResult], 1)
-	pk := partitionKey("underlayName")
-	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, pk, &azcosmos.QueryOptions{QueryParameters: parameters})
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.partitionKey, &azcosmos.QueryOptions{QueryParameters: parameters})
 	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
 	// results := make([]any, 0)
@@ -131,9 +136,6 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 
 	const sel = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE`
 
-	// var named map[string]any
-	// var args []any
-
 	build := strings.Builder{}
 	build.WriteString(sel)
 
@@ -141,15 +143,15 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 
 	if len(filters.ByIDs) > 0 {
 		numFilters++
-		build.WriteString(" id IN $ids")
-		// add cosmosdb qeury pareameterZ? or just rely on string replace?
+		// ARRAY_CONTAINS(@ids, id) instead? I'm not sure is IN and $ids will work with params struct
+		build.WriteString(" id IN @ids")
 	}
 	if len(filters.ByGroupIDs) > 0 {
 		if numFilters > 0 {
 			build.WriteString(" AND")
 		}
 		numFilters++
-		build.WriteString(" group_id IN $group_ids")
+		build.WriteString(" group_id IN @group_ids")
 	}
 	if len(filters.ByStatus) > 0 {
 		if numFilters > 0 {
@@ -165,7 +167,7 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 				build.WriteString(fmt.Sprintf(" AND state_status = %s", name))
 			}
 			parameters = append(parameters, azcosmos.QueryParameter{
-				Name:  "$status",
+				Name:  "@status",
 				Value: int64(s),
 			})
 		}
@@ -175,16 +177,17 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 
 	if len(filters.ByIDs) > 0 {
 		var idArgs []any
-		query, idArgs = replaceWithIDs(query, "$id", filters.ByIDs)
+		_, idArgs = replaceWithIDs(query, "$id", filters.ByIDs)
 		// args = append(args, idArgs...)
 		parameters = append(parameters, azcosmos.QueryParameter{
-			Name:  "$ids",
+			Name:  "@ids",
 			Value: idArgs,
 		})
 	}
 	if len(filters.ByGroupIDs) > 0 {
 		var groupArgs []any
-		query, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
+		// _, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
+		_, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
 		// args = append(args, groupArgs...)
 		parameters = append(parameters, azcosmos.QueryParameter{
 			Name:  "$group_ids",
@@ -209,8 +212,7 @@ func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storag
 		named["$limit"] = limit
 	}
 
-	pk := partitionKey("underlayName")
-	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, pk, &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.partitionKey, &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
 	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
 	// results := make([]any, 0)
@@ -274,26 +276,26 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 	}
 
 	result := storage.ListResult{}
-	result.ID, err = uuid.Parse(resp.id)
+	result.ID, err = uuid.Parse(resp.ID)
 	if err != nil {
 		return result, fmt.Errorf("couldn't convert ID to UUID: %w", err)
 	}
-	gid := resp.groupID
+	gid := resp.GroupID
 	if gid == "" {
 		result.GroupID = uuid.Nil
 	} else {
-		result.GroupID, err = uuid.Parse(resp.groupID)
+		result.GroupID, err = uuid.Parse(resp.GroupID)
 		if err != nil {
 			return result, fmt.Errorf("couldn't convert GroupID to UUID: %w", err)
 		}
 	}
-	result.Name = resp.name
-	result.Descr = resp.descr
-	result.SubmitTime = time.Unix(0, resp.submitTime)
+	result.Name = resp.Name
+	result.Descr = resp.Descr
+	result.SubmitTime = time.Unix(0, resp.SubmitTime)
 	result.State = &workflow.State{
-		Status: workflow.Status(resp.stateStatus),
-		Start:  time.Unix(0, resp.stateStart),
-		End:    time.Unix(0, resp.stateEnd),
+		Status: workflow.Status(resp.StateStatus),
+		Start:  time.Unix(0, resp.StateStart),
+		End:    time.Unix(0, resp.StateEnd),
 	}
 	return result, nil
 }

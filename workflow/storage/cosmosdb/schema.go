@@ -9,22 +9,22 @@ var tables = []string{
 }
 
 type plansEntry struct {
-	id             string `json:"id,omitempty"`
-	groupID        string `json:"groupID,omitempty"`
-	name           string `json:"name,omitempty"`
-	descr          string `json:"descr,omitempty"`
-	meta           []byte `json:"meta,omitempty"`
-	bypassChecks   string `json:"bypassChecks,omitempty"`
-	preChecks      string `json:"preChecks,omitempty"`
-	postChecks     string `json:"postChecks,omitempty"`
-	contChecks     string `json:"contChecks,omitempty"`
-	deferredChecks string `json:"deferredChecks,omitempty"`
-	blocks         string `json:"blocks,omitempty"`
-	stateStatus    int64  `json:"stateStatus,omitempty"`
-	stateStart     int64  `json:"stateStart,omitempty"`
-	stateEnd       int64  `json:"stateEnd,omitempty"`
-	submitTime     int64  `json:"submitTime,omitempty"`
-	reason         int64  `json:"reason,omitempty"`
+	ID             string `json:"id,omitempty"`
+	GroupID        string `json:"groupID,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Descr          string `json:"descr,omitempty"`
+	Meta           []byte `json:"meta,omitempty"`
+	BypassChecks   string `json:"bypassChecks,omitempty"`
+	PreChecks      string `json:"preChecks,omitempty"`
+	PostChecks     string `json:"postChecks,omitempty"`
+	ContChecks     string `json:"contChecks,omitempty"`
+	DeferredChecks string `json:"deferredChecks,omitempty"`
+	Blocks         string `json:"blocks,omitempty"`
+	StateStatus    int64  `json:"stateStatus,omitempty"`
+	StateStart     int64  `json:"stateStart,omitempty"`
+	StateEnd       int64  `json:"stateEnd,omitempty"`
+	SubmitTime     int64  `json:"submitTime,omitempty"`
+	Reason         int64  `json:"reason,omitempty"`
 }
 
 var planSchema = `

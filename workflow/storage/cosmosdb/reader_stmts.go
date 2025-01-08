@@ -114,3 +114,20 @@ func replaceWithIDs(query, replace string, ids []uuid.UUID) (string, []any) {
 	b.WriteString(")")
 	return strings.Replace(query, replace, b.String(), 1), args
 }
+
+// maybe it doesn't actually have to be a  string?
+func idsArrayParam(ids []uuid.UUID) string {
+	args := make([]any, 0, len(ids))
+	b := strings.Builder{}
+	b.WriteString("['")
+	for i := range ids {
+		args = append(args, ids[i])
+		if i < len(ids)-1 {
+			b.WriteString("','")
+		} else {
+			// b.WriteString("'")
+		}
+	}
+	b.WriteString("']")
+	return b.String()
+}

@@ -31,8 +31,7 @@ func (p reader) fetchChecksByID(ctx context.Context, id uuid.UUID) (*workflow.Ch
 		EnableContentResponseOnWrite: true,
 	}
 
-	key := partitionKey("underlayName")
-	res, err := p.cc.GetChecksClient().ReadItem(ctx, key, id.String(), itemOpt)
+	res, err := p.cc.GetChecksClient().ReadItem(ctx, p.cc.partitionKey, id.String(), itemOpt)
 	if err != nil {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
 		return nil, fmt.Errorf("couldn't fetch checks by id: %w", err)

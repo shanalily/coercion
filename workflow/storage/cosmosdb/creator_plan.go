@@ -11,7 +11,7 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 const insertPlan = `
@@ -38,38 +38,35 @@ const insertPlan = `
 var zeroTime = time.Unix(0, 0)
 
 // commitPlan commits a plan to the database. This commits the entire plan and all sub-objects.
-func commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
+func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 	if p == nil {
 		return fmt.Errorf("planToSQL: plan cannot be nil")
 	}
 
-	// defer cosmosdbx.Transaction(conn)(&err)
+	plan := plansEntry{
+		ID:      p.ID.String(),
+		GroupID: p.GroupID.String(),
+		Name:    p.Name,
+		Descr:   p.Descr,
+		// meta: p.Meta,
+	}
 
-	// stmt, err := conn.Prepare(insertPlan)
-	// if err != nil {
-	// 	return fmt.Errorf("planToSQL(insertPlan): %w", err)
-	// }
-
-	// stmt.SetText("$id", p.ID.String())
-	// stmt.SetText("$group_id", p.GroupID.String())
-	// stmt.SetText("$name", p.Name)
-	// stmt.SetText("$descr", p.Descr)
 	// stmt.SetBytes("$meta", p.Meta)
-	// if p.BypassChecks != nil {
-	// 	stmt.SetText("$bypasschecks", p.BypassChecks.ID.String())
-	// }
-	// if p.PreChecks != nil {
-	// 	stmt.SetText("$prechecks", p.PreChecks.ID.String())
-	// }
-	// if p.PostChecks != nil {
-	// 	stmt.SetText("$postchecks", p.PostChecks.ID.String())
-	// }
-	// if p.ContChecks != nil {
-	// 	stmt.SetText("$contchecks", p.ContChecks.ID.String())
-	// }
-	// if p.DeferredChecks != nil {
-	// 	stmt.SetText("$deferredchecks", p.DeferredChecks.ID.String())
-	// }
+	if p.BypassChecks != nil {
+		plan.BypassChecks = p.BypassChecks.ID.String()
+	}
+	if p.PreChecks != nil {
+		plan.PreChecks = p.PreChecks.ID.String()
+	}
+	if p.PostChecks != nil {
+		plan.PostChecks = p.PostChecks.ID.String()
+	}
+	if p.ContChecks != nil {
+		plan.ContChecks = p.ContChecks.ID.String()
+	}
+	if p.DeferredChecks != nil {
+		plan.DeferredChecks = p.DeferredChecks.ID.String()
+	}
 
 	// blocks, err := idsToJSON(p.Blocks)
 	// if err != nil {
@@ -110,6 +107,22 @@ func commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 	// 	if err := commitBlock(ctx, p.ID, i, b); err != nil {
 	// 		return fmt.Errorf("planToSQL(commitBlocks): %w", err)
 	// 	}
+
+	// save the JSON format document into Cosmos DB.
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(plan)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
+
+	res, err := u.cc.plansClient.CreateItem(ctx, u.cc.partitionKey, itemJson, itemOpt)
+	if err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res)
+
 	// }
 
 	return nil

@@ -40,11 +40,5 @@ func (u creator) Create(ctx context.Context, plan *workflow.Plan) error {
 		return fmt.Errorf("plan with ID(%s) already exists", plan.ID)
 	}
 
-	// conn, err := u.pool.Take(ctx)
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't get a connection from the pool: %w", err)
-	// }
-	// defer u.pool.Put(conn)
-
-	return commitPlan(ctx, plan)
+	return u.commitPlan(ctx, plan)
 }

@@ -10,7 +10,7 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	// "os"
+	"log/slog"
 	// "path/filepath"
 	"sync"
 
@@ -33,7 +33,7 @@ type Vault struct {
 	// dbName is the database name for the storage.
 	dbName string
 	// partitionKey is the partition key for the starage.
-	partitionKey string
+	partitionKey azcosmos.PartitionKey
 
 	reader
 	creator
@@ -63,6 +63,7 @@ type ContainerClient interface {
 	Read(context.Context, *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error)
 	ReadItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+	// GetPK() azcosmos.PartitionKey ?
 }
 
 func partitionKey(val string) azcosmos.PartitionKey {
@@ -81,6 +82,7 @@ type Client interface {
 // on data model.
 type CosmosDBClient struct {
 	// publisher arg.Publisher
+	partitionKey azcosmos.PartitionKey
 
 	// implement types per client later? just use containerclient for now
 	plansClient     *azcosmos.ContainerClient
@@ -162,14 +164,12 @@ func (c *CosmosDBClient) containers() []container {
 // New is the constructor for *ReadWriter. root is the root path for the storage.
 // If the root path does not exist, it will be created.
 // Instead of sqlite package, create client to existing cosmosdb.
-func New(ctx context.Context, endpoint string, cred azcore.TokenCredential, reg *registry.Register, options ...Option) (*Vault, error) {
+func New(ctx context.Context, endpoint, dbName, pk string, cred azcore.TokenCredential, reg *registry.Register, options ...Option) (*Vault, error) {
 	ctx = context.WithoutCancel(ctx)
 
-	dbName := ""
-	partitionKey := ""
 	r := &Vault{
 		dbName:       dbName,
-		partitionKey: partitionKey,
+		partitionKey: partitionKey(pk),
 	}
 	for _, o := range options {
 		if err := o(r); err != nil {
@@ -179,6 +179,7 @@ func New(ctx context.Context, endpoint string, cred azcore.TokenCredential, reg 
 
 	// o =
 	client, err := azcosmos.NewClient(endpoint, cred, nil)
+	// client, err := azcosmos.NewClientWithKey(endpoint, cosmosDBCred, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +192,7 @@ func New(ctx context.Context, endpoint string, cred azcore.TokenCredential, reg 
 	if err != nil {
 		return nil, err
 	}
+	cc.partitionKey = r.partitionKey
 
 	// create pool to limit clients connections or nah?
 
@@ -213,8 +215,26 @@ func createContainerClients(
 
 	client := &CosmosDBClient{}
 
+	dc, err := azCosmosClient.NewDatabase(dbName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Cosmos DB database client: %w", err)
+	}
+
 	// TODO (sehobbs) - Consider making container creation a concurrent operation.
 	for _, c := range client.containers() {
+		// what if already created?
+		activityID, err := createContainer(ctx, dc, c.name)
+		if err != nil {
+			switch {
+			case IsConflict(err):
+				slog.Default().Warn(fmt.Sprintf("Container %s already exists: %s", c.name, err))
+			default:
+				return nil, fmt.Errorf("failed to create Cosmos DB container: container=%s. %w", c.name, err)
+			}
+		} else {
+			slog.Default().Info(activityID)
+		}
+
 		cc, err := azCosmosClient.NewContainer(dbName, c.name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Cosmos DB container client: container=%s. %w", c.name, err)
@@ -241,7 +261,7 @@ func createContainerClient(client *azcosmos.Client, dbName, containerName string
 }
 
 // For creating if it doesn't exist? should probably get precreated for multiple customers in bicep template though.
-func createContainer(ctx context.Context, database azcosmos.DatabaseClient, cname string) (string, error) {
+func createContainer(ctx context.Context, database *azcosmos.DatabaseClient, cname string) (string, error) {
 	properties := azcosmos.ContainerProperties{
 		ID: cname,
 		PartitionKeyDefinition: azcosmos.PartitionKeyDefinition{

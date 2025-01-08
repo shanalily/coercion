@@ -21,7 +21,7 @@ import (
 
 // reader implements the storage.PlanReader interface.
 type reader struct {
-	cc  *CosmosDBClient
+	cc  Client
 	reg *registry.Register
 }
 
@@ -44,7 +44,7 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 		EnableContentResponseOnWrite: true,
 	}
 
-	_, err := r.cc.plansClient.ReadItem(ctx, r.cc.partitionKey, id.String(), itemOpt)
+	_, err := r.cc.GetPlansClient().ReadItem(ctx, r.cc.GetPK(), id.String(), itemOpt)
 	if err != nil {
 		if IsNotFound(err) {
 			return false, nil
@@ -69,7 +69,7 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 	q, parameters := r.buildSearchQuery(filters)
 
 	// results := make(chan storage.Stream[storage.ListResult], 1)
-	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.partitionKey, &azcosmos.QueryOptions{QueryParameters: parameters})
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: parameters})
 	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
 	// results := make([]any, 0)
@@ -212,7 +212,7 @@ func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storag
 		named["$limit"] = limit
 	}
 
-	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.partitionKey, &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
+	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
 	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
 	// results := make([]any, 0)

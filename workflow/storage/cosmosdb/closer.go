@@ -9,7 +9,7 @@ import (
 )
 
 type closer struct {
-	cc *CosmosDBClient
+	cc Client
 	// pool *cosmosdbx.Pool
 
 	private.Storage

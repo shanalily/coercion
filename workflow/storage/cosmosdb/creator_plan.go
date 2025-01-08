@@ -44,10 +44,11 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 	}
 
 	plan := plansEntry{
-		ID:      p.ID.String(),
-		GroupID: p.GroupID.String(),
-		Name:    p.Name,
-		Descr:   p.Descr,
+		PartitionKey: u.cc.GetPKString(),
+		ID:           p.ID.String(),
+		GroupID:      p.GroupID.String(),
+		Name:         p.Name,
+		Descr:        p.Descr,
 		// meta: p.Meta,
 	}
 
@@ -117,7 +118,7 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.plansClient.CreateItem(ctx, u.cc.partitionKey, itemJson, itemOpt)
+	res, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
 	if err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}

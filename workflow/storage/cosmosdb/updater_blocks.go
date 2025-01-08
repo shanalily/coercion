@@ -23,7 +23,7 @@ type blockUpdater struct {
 }
 
 // UpdateBlock implements storage.Blockupdater.UpdateBlock().
-func (b blockUpdater) UpdateBlock(ctx context.Context, action *workflow.Block) error {
+func (b blockUpdater) UpdateBlock(ctx context.Context, block *workflow.Block) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

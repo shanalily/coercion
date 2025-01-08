@@ -13,7 +13,7 @@ import (
 
 type deleter struct {
 	mu *sync.Mutex
-	cc *CosmosDBClient
+	cc Client
 	// pool *cosmosdbx.Pool
 
 	reader reader

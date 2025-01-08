@@ -8,6 +8,7 @@ supported.
 package cosmosdb
 
 import (
+	// "strings"
 	"context"
 	"fmt"
 	"log/slog"
@@ -33,7 +34,8 @@ type Vault struct {
 	// dbName is the database name for the storage.
 	dbName string
 	// partitionKey is the partition key for the starage.
-	partitionKey azcosmos.PartitionKey
+	// This assumes the service will use a single partition.
+	partitionKey string
 
 	reader
 	creator
@@ -63,7 +65,6 @@ type ContainerClient interface {
 	Read(context.Context, *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error)
 	ReadItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
-	// GetPK() azcosmos.PartitionKey ?
 }
 
 func partitionKey(val string) azcosmos.PartitionKey {
@@ -76,13 +77,14 @@ type Client interface {
 	GetChecksClient() ContainerClient    // *azcosmos.ContainerClient
 	GetSequencesClient() ContainerClient //*azcosmos.ContainerClient
 	GetActionsClient() ContainerClient   //*azcosmos.ContainerClient
+	GetPK() azcosmos.PartitionKey
+	GetPKString() string
 }
 
 // CosmosDBClient has the methods for all of Create/Update/Delete/Query operation
 // on data model.
 type CosmosDBClient struct {
-	// publisher arg.Publisher
-	partitionKey azcosmos.PartitionKey
+	partitionKey string
 
 	// implement types per client later? just use containerclient for now
 	plansClient     *azcosmos.ContainerClient
@@ -119,9 +121,25 @@ func (c *CosmosDBClient) GetActionsClient() ContainerClient {
 	return c.actionsClient
 }
 
+func (c *CosmosDBClient) GetPK() azcosmos.PartitionKey {
+	return partitionKey(c.partitionKey)
+}
+
+func (c *CosmosDBClient) GetPKString() string {
+	return c.partitionKey
+}
+
 type container struct {
 	name string
 	init func(*azcosmos.ContainerClient)
+	// only used if creating containers in test environment
+	indexPaths []azcosmos.IncludedPath
+}
+
+func pathToScalar(path string) azcosmos.IncludedPath {
+	return azcosmos.IncludedPath{
+		Path: fmt.Sprintf("/%s/?", path),
+	}
 }
 
 func (c *CosmosDBClient) containers() []container {
@@ -131,11 +149,27 @@ func (c *CosmosDBClient) containers() []container {
 			init: func(cc *azcosmos.ContainerClient) {
 				c.plansClient = cc
 			},
+			indexPaths: []azcosmos.IncludedPath{
+				// pathToScalar("id"),
+				pathToScalar("groupID"),
+				pathToScalar("stateStatus"),
+				pathToScalar("stateStart"),
+				pathToScalar("stateEnd"),
+				pathToScalar("reason"),
+			},
 		},
 		{
 			name: "blocks",
 			init: func(cc *azcosmos.ContainerClient) {
 				c.blocksClient = cc
+			},
+			indexPaths: []azcosmos.IncludedPath{
+				// pathToScalar("id"),
+				pathToScalar("key"),
+				pathToScalar("planID"),
+				pathToScalar("stateStatus"),
+				pathToScalar("stateStart"),
+				pathToScalar("stateEnd"),
 			},
 		},
 		{
@@ -143,17 +177,42 @@ func (c *CosmosDBClient) containers() []container {
 			init: func(cc *azcosmos.ContainerClient) {
 				c.checksClient = cc
 			},
+			indexPaths: []azcosmos.IncludedPath{
+				// pathToScalar("id"),
+				pathToScalar("key"),
+				pathToScalar("planID"),
+				pathToScalar("stateStatus"),
+				pathToScalar("stateStart"),
+				pathToScalar("stateEnd"),
+			},
 		},
 		{
 			name: "sequences",
 			init: func(cc *azcosmos.ContainerClient) {
 				c.sequencesClient = cc
 			},
+			indexPaths: []azcosmos.IncludedPath{
+				// pathToScalar("id"),
+				pathToScalar("key"),
+				pathToScalar("planID"),
+				pathToScalar("stateStatus"),
+				pathToScalar("stateStart"),
+				pathToScalar("stateEnd"),
+			},
 		},
 		{
 			name: "actions",
 			init: func(cc *azcosmos.ContainerClient) {
 				c.actionsClient = cc
+			},
+			indexPaths: []azcosmos.IncludedPath{
+				// pathToScalar("id"),
+				pathToScalar("key"),
+				pathToScalar("planID"),
+				pathToScalar("stateStatus"),
+				pathToScalar("stateStart"),
+				pathToScalar("stateEnd"),
+				pathToScalar("plugin"),
 			},
 		},
 	}
@@ -169,7 +228,7 @@ func New(ctx context.Context, endpoint, dbName, pk string, cred azcore.TokenCred
 
 	r := &Vault{
 		dbName:       dbName,
-		partitionKey: partitionKey(pk),
+		partitionKey: pk,
 	}
 	for _, o := range options {
 		if err := o(r); err != nil {
@@ -187,12 +246,10 @@ func New(ctx context.Context, endpoint, dbName, pk string, cred azcore.TokenCred
 	// create container for customer? or container per table for all customers?
 	// multiple containers per customer?
 	// need containers/tables for plans, blocks, checks, sequences, and actions.
-
-	cc, err := createContainerClients(ctx, dbName, endpoint, client)
+	cc, err := createContainerClients(ctx, dbName, endpoint, pk, client)
 	if err != nil {
 		return nil, err
 	}
-	cc.partitionKey = r.partitionKey
 
 	// create pool to limit clients connections or nah?
 
@@ -210,10 +267,12 @@ func New(ctx context.Context, endpoint, dbName, pk string, cred azcore.TokenCred
 // dbEndpoint - the Cosmos DB's https endpoint
 func createContainerClients(
 	ctx context.Context,
-	dbName, dbEndpoint string,
+	dbName, dbEndpoint, pk string,
 	azCosmosClient *azcosmos.Client) (*CosmosDBClient, error) {
 
-	client := &CosmosDBClient{}
+	client := &CosmosDBClient{
+		partitionKey: pk,
+	}
 
 	dc, err := azCosmosClient.NewDatabase(dbName)
 	if err != nil {
@@ -223,7 +282,7 @@ func createContainerClients(
 	// TODO (sehobbs) - Consider making container creation a concurrent operation.
 	for _, c := range client.containers() {
 		// what if already created?
-		activityID, err := createContainer(ctx, dc, c.name)
+		activityID, err := createContainer(ctx, dc, c.name, c.indexPaths)
 		if err != nil {
 			switch {
 			case IsConflict(err):
@@ -234,6 +293,12 @@ func createContainerClients(
 		} else {
 			slog.Default().Info(activityID)
 		}
+		// activityID, err := recreateContainer(ctx, azCosmosClient, dbName, dbEndpoint, c.name, c.indexPaths)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to create Cosmos DB container: container=%s. %w", c.name, err)
+		// } else {
+		// 	slog.Default().Info(activityID)
+		// }
 
 		cc, err := azCosmosClient.NewContainer(dbName, c.name)
 		if err != nil {
@@ -261,17 +326,80 @@ func createContainerClient(client *azcosmos.Client, dbName, containerName string
 }
 
 // For creating if it doesn't exist? should probably get precreated for multiple customers in bicep template though.
-func createContainer(ctx context.Context, database *azcosmos.DatabaseClient, cname string) (string, error) {
+func createContainer(ctx context.Context, database *azcosmos.DatabaseClient, cname string, indexPaths []azcosmos.IncludedPath) (string, error) {
 	properties := azcosmos.ContainerProperties{
 		ID: cname,
 		PartitionKeyDefinition: azcosmos.PartitionKeyDefinition{
-			// Paths: []string{"/id"},
-			Paths: []string{"/underlayName"},
+			Paths: []string{"/partitionKey"},
+		},
+		IndexingPolicy: &azcosmos.IndexingPolicy{
+			IncludedPaths: indexPaths,
+			// exclude by default
+			ExcludedPaths: []azcosmos.ExcludedPath{
+				{
+					Path: "/*",
+				},
+			},
+			Automatic:    true,
+			IndexingMode: azcosmos.IndexingModeConsistent,
 		},
 	}
 
 	throughput := azcosmos.NewManualThroughputProperties(400)
 	response, err := database.CreateContainer(ctx, properties, &azcosmos.CreateContainerOptions{ThroughputProperties: &throughput})
+	if err != nil {
+		return "", err
+	}
+	return response.ActivityID, nil
+}
+
+func recreateContainer(ctx context.Context, client *azcosmos.Client, dbName, dbEndpoint, cname string, indexPaths []azcosmos.IncludedPath) (string, error) {
+	found := true
+	cc, err := client.NewContainer(dbName, cname)
+	if err != nil { //&& !IsNotFound(err) {
+		// if !strings.Contains(err.Error(), "Resource Not Found") {
+		return "", fmt.Errorf(
+			"failed to connect to Cosmos DB container: endpoint=%q, container=%q. %w",
+			dbEndpoint,
+			cname,
+			err,
+		)
+	}
+	if _, err = cc.Read(ctx, nil); err != nil {
+		if !IsNotFound(err) {
+			return "", fmt.Errorf(
+				"failed to connect to Cosmos DB container: endpoint=%q, container=%q. %w",
+				dbEndpoint,
+				cname,
+				err,
+			)
+		}
+		found = false
+	}
+
+	if found {
+		_, err = deleteContainer(ctx, cc)
+		if err != nil {
+			return "", fmt.Errorf("failed to delete Cosmos DB container: container=%s. %w", cname, err)
+		}
+	}
+
+	dc, err := client.NewDatabase(dbName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create Cosmos DB database client: %w", err)
+	}
+	activityID, err := createContainer(ctx, dc, cname, indexPaths)
+	if err != nil && !IsConflict(err) {
+		return "", fmt.Errorf("failed to create Cosmos DB container: container=%s. %w", cname, err)
+		// slog.Default().Warn(fmt.Sprintf("Container %s already exists: %s", c.name, err))
+	}
+
+	return activityID, nil
+}
+
+// For deleting in testing.
+func deleteContainer(ctx context.Context, cc *azcosmos.ContainerClient) (string, error) {
+	response, err := cc.Delete(ctx, &azcosmos.DeleteContainerOptions{})
 	if err != nil {
 		return "", err
 	}

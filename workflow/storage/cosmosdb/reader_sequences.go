@@ -35,8 +35,7 @@ func (p reader) fetchSequenceByID(ctx context.Context, id uuid.UUID) (*workflow.
 		EnableContentResponseOnWrite: true,
 	}
 
-	key := partitionKey("underlayName")
-	res, err := p.cc.GetSequencesClient().ReadItem(ctx, key, id.String(), itemOpt)
+	res, err := p.cc.GetSequencesClient().ReadItem(ctx, p.cc.GetPK(), id.String(), itemOpt)
 	if err != nil {
 		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
 		return nil, fmt.Errorf("couldn't fetch sequence by id: %w", err)

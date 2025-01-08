@@ -9,6 +9,7 @@ var tables = []string{
 }
 
 type plansEntry struct {
+	PartitionKey   string `json:"partitionKey,omitempty"`
 	ID             string `json:"id,omitempty"`
 	GroupID        string `json:"groupID,omitempty"`
 	Name           string `json:"name,omitempty"`

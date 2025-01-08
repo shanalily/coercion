@@ -15,7 +15,7 @@ import (
 // creator implements the storage.creator interface.
 type creator struct {
 	mu *sync.Mutex
-	cc *CosmosDBClient
+	cc Client
 	// pool   *cosmosdbx.Pool
 	reader reader
 

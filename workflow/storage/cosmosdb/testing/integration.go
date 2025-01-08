@@ -9,12 +9,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/element-of-surprise/coercion/plugins/registry"
-	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb"
 	"github.com/element-of-surprise/coercion/workflow"
+	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb"
+	"github.com/google/uuid"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 const (
 	accountName = "medbaydb"
 	dbName      = "medbaydb"
-	pk          = "underlayName"
+	pk          = "controlplaneid"
 )
 
 func main() {
@@ -60,9 +60,9 @@ func main() {
 	}
 
 	plan := &workflow.Plan{
-		ID: planID,
-		Name:  "plan name",
-		Descr: "plan descr",
+		ID:        planID,
+		Name:      "plan name",
+		Descr:     "plan descr",
 		PreChecks: &workflow.Checks{},
 		Blocks: []*workflow.Block{
 			{

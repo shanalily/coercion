@@ -31,7 +31,7 @@ var ErrCosmosDBNotFound error = fmt.Errorf("cosmosdb error: %w", &azcore.Respons
 // CosmosDBClient has the methods for all of Create/Update/Delete/Query operation
 // on data model.
 type FakeCosmosDBClient struct {
-	// publisher arg.Publisher
+	partitionKey string
 
 	// implement types per client later? just use containerclient for now
 	// is there no interface for the cosmosdb container client? I need functions like ReadItem.
@@ -229,6 +229,14 @@ func (c *FakeCosmosDBClient) GetSequencesClient() ContainerClient {
 
 func (c *FakeCosmosDBClient) GetActionsClient() ContainerClient {
 	return c.actionsClient
+}
+
+func (c *FakeCosmosDBClient) GetPK() azcosmos.PartitionKey {
+	return partitionKey(c.partitionKey)
+}
+
+func (c *FakeCosmosDBClient) GetPKString() string {
+	return c.partitionKey
 }
 
 type Pager[T any] struct {

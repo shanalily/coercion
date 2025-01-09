@@ -155,7 +155,8 @@ func (c *CosmosDBClient) containers() []container {
 				pathToScalar("stateStart"),
 				pathToScalar("stateEnd"),
 				pathToScalar("reason"),
-				// submitTime?
+				// submitTime? do I need a composite index for more efficient ordering?
+				pathToScalar("submitTime"),
 			},
 		},
 		{
@@ -211,6 +212,8 @@ func (c *CosmosDBClient) containers() []container {
 				pathToScalar("stateStart"),
 				pathToScalar("stateEnd"),
 				pathToScalar("plugin"),
+				// do I need a composite index?
+				pathToScalar("pos"),
 			},
 		},
 	}

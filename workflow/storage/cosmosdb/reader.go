@@ -19,6 +19,15 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	// beginning of query to list plans with a filter
+	searchPlans = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE`
+	// list all plans without parameters
+	// const listPlans = `SELECT id, groupID, name, descr, submitTime, stateStatus, stateStart, stateEnd FROM plans ORDER BY submitTime DESC`
+	// can I list by submitTime without indexing?
+	listPlans = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p ORDER BY p.submitTime DESC`
+)
+
 // reader implements the storage.PlanReader interface.
 type reader struct {
 	cc  Client
@@ -49,18 +58,17 @@ func (r reader) Exists(ctx context.Context, id uuid.UUID) (bool, error) {
 		if IsNotFound(err) {
 			return false, nil
 		}
-		// return p, fmt.Errorf("failed to read item through Cosmos DB API: %w", cosmosErr(err))
-		return false, fmt.Errorf("couldn't fetch block by id: %w", err)
+		return false, fmt.Errorf("couldn't fetch plan by id: %w", err)
 	}
 	return true, nil
 }
 
-// ReadPlan returns a Plan from the storage.
+// Read returns a Plan from the storage.
 func (r reader) Read(ctx context.Context, id uuid.UUID) (*workflow.Plan, error) {
 	return r.fetchPlan(ctx, id)
 }
 
-// SearchPlans returns a list of Plan IDs that match the filter.
+// Search returns a list of Plan IDs that match the filter.
 func (r reader) Search(ctx context.Context, filters storage.Filters) (chan storage.Stream[storage.ListResult], error) {
 	if err := filters.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid filter: %w", err)
@@ -68,11 +76,8 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 
 	q, parameters := r.buildSearchQuery(filters)
 
-	// results := make(chan storage.Stream[storage.ListResult], 1)
 	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: parameters})
-	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
-	// results := make([]any, 0)
 	results := make([]storage.ListResult, 0)
 	go func() {
 		defer close(resultsStream)
@@ -109,17 +114,13 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.QueryParameter) {
 	parameters := []azcosmos.QueryParameter{}
 
-	// const sel = `SELECT id, groupID, name, descr, submitTime, stateStatus, stateStart, stateEnd FROM plans WHERE`
-	const sel = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE`
-
 	build := strings.Builder{}
-	build.WriteString(sel)
+	build.WriteString(searchPlans)
 
 	numFilters := 0
 
 	if len(filters.ByIDs) > 0 {
 		numFilters++
-		// ARRAY_CONTAINS(@ids, id) instead? I'm not sure is IN and $ids will work with params struct
 		build.WriteString(" ARRAY_CONTAINS(@ids, p.id)")
 	}
 	if len(filters.ByGroupIDs) > 0 {
@@ -127,7 +128,7 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 			build.WriteString(" AND")
 		}
 		numFilters++
-		build.WriteString(" groupID IN @group_ids")
+		build.WriteString(" ARRAY_CONTAINS(@group_ids, p.groupID)")
 	}
 	if len(filters.ByStatus) > 0 {
 		if numFilters > 0 {
@@ -135,57 +136,43 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 		}
 		numFilters++ // I know this says inEffectual assignment and it is, but it is here for completeness.
 		for i, s := range filters.ByStatus {
-			name := fmt.Sprintf("$status%d", i)
-			// named[name] = int64(s)
+			name := fmt.Sprintf("@status%d", i)
 			if i == 0 {
-				build.WriteString(fmt.Sprintf(" stateStatus = %s", name))
+				build.WriteString(fmt.Sprintf(" p.stateStatus = %s", name))
 			} else {
-				build.WriteString(fmt.Sprintf(" AND stateStatus = %s", name))
+				build.WriteString(fmt.Sprintf(" AND p.stateStatus = %s", name))
 			}
 			parameters = append(parameters, azcosmos.QueryParameter{
-				Name:  "@status",
+				Name:  name,
 				Value: int64(s),
 			})
 		}
 	}
-	// build.WriteString(" ORDER BY submitTime DESC;")
+	build.WriteString(" ORDER BY p.submitTime DESC")
 	query := build.String()
 
 	if len(filters.ByIDs) > 0 {
-		var idArgs []any
-		_, idArgs = replaceWithIDs(query, "$id", filters.ByIDs)
-		// args = append(args, idArgs...)
 		parameters = append(parameters, azcosmos.QueryParameter{
 			Name:  "@ids",
-			Value: idArgs,
+			Value: filters.ByIDs,
 		})
 	}
 	if len(filters.ByGroupIDs) > 0 {
-		var groupArgs []any
-		// _, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
-		_, groupArgs = replaceWithIDs(query, "$group_id", filters.ByGroupIDs)
-		// args = append(args, groupArgs...)
 		parameters = append(parameters, azcosmos.QueryParameter{
-			Name:  "$group_ids",
-			Value: groupArgs,
+			Name:  "@group_ids",
+			Value: filters.ByGroupIDs,
 		})
 	}
-	return query, parameters // args, named
+	return query, parameters
 }
 
 // List returns a list of Plan IDs in the storage in order from newest to oldest. This should
 // return with most recent submiited first. Limit sets the maximum number of
 // entrie to return
 func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storage.ListResult], error) {
-	// list all plans without parameters
-	// const listPlans = `SELECT id, groupID, name, descr, submitTime, stateStatus, stateStart, stateEnd FROM plans ORDER BY submitTime DESC`
-	// can I list by submitTime without indexing?
-	const listPlans = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p ORDER BY p.stateStart DESC`
-
-	// does this work with cosmosdb
 	q := listPlans
 	if limit > 0 {
-		q += " LIMIT $limit;"
+		q += fmt.Sprintf(" OFFSET 0 LIMIT %d", limit)
 	}
 
 	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
@@ -249,30 +236,6 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 	return result, nil
 }
 
-// // listResultsFunc is a helper function to convert a SQLite statement into a ListResult.
-// func (r reader) listResultsFunc(resp azcosmos.QueryItemsResponse) (storage.ListResult, error) {
-// 	// still need to iterate through items here: response has Items of type [][]byte
-// 	result := storage.ListResult{}
-// 	var err error
-// 	result.ID, err = fieldToID("id", stmt)
-// 	if err != nil {
-// 		return storage.ListResult{}, fmt.Errorf("couldn't get ID: %w", err)
-// 	}
-// 	result.GroupID, err = fieldToID("group_id", stmt)
-// 	if err != nil {
-// 		return storage.ListResult{}, fmt.Errorf("couldn't get group ID: %w", err)
-// 	}
-// 	result.Name = stmt.GetText("name")
-// 	result.Descr = stmt.GetText("descr")
-// 	result.SubmitTime = time.Unix(0, stmt.GetInt64("submit_time"))
-// 	result.State = &workflow.State{
-// 		Status: workflow.Status(stmt.GetInt64("state_status")),
-// 		Start:  time.Unix(0, stmt.GetInt64("state_start")),
-// 		End:    time.Unix(0, stmt.GetInt64("state_end")),
-// 	}
-// 	return result, nil
-// }
-
 func (r reader) private() {
 	return
 }
@@ -323,7 +286,7 @@ func timeFromInt64(unixTime int64) (time.Time, error) {
 	return t, nil
 }
 
-// fieldToState pulls the state_start, state_end and state_status from a stmt
+// fieldToState pulls the stateStart, stateEnd and stateStatus from a stmt
 // and turns them into a *workflow.State.
 func fieldToState(stateStatus, stateStart, stateEnd int64) (*workflow.State, error) {
 	start, err := timeFromInt64(stateStart)

@@ -43,7 +43,7 @@ func TestBuildSearchQuery(t *testing.T) {
 		{
 			name:       "Success: empty filters",
 			filters:    storage.Filters{},
-			wantQuery:  `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE ORDER BY submit_time DESC;`,
+			wantQuery:  `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE ORDER BY p.submitTime DESC`,
 			wantParams: nil,
 		},
 		{
@@ -53,11 +53,13 @@ func TestBuildSearchQuery(t *testing.T) {
 					id1,
 				},
 			},
-			wantQuery: `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE id IN @ids ORDER BY submit_time DESC;`,
+			wantQuery: `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE ARRAY_CONTAINS(@ids, p.id) ORDER BY p.submitTime DESC`,
 			wantParams: []azcosmos.QueryParameter{
 				{
-					Name:  "@ids",
-					Value: "['" + id1.String() + "']",
+					Name: "@ids",
+					Value: []uuid.UUID{
+						id1,
+					},
 				},
 			},
 		},
@@ -69,11 +71,14 @@ func TestBuildSearchQuery(t *testing.T) {
 					id2,
 				},
 			},
-			wantQuery: `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE id IN @ids ORDER BY submit_time DESC;`,
+			wantQuery: `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE ARRAY_CONTAINS(@ids, p.id) ORDER BY p.submitTime DESC`,
 			wantParams: []azcosmos.QueryParameter{
 				{
-					Name:  "@ids",
-					Value: "['" + id1.String() + "','" + id2.String() + "']",
+					Name: "@ids",
+					Value: []uuid.UUID{
+						id1,
+						id2,
+					},
 				},
 			},
 		},

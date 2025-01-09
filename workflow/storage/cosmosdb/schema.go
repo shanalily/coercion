@@ -163,8 +163,8 @@ type actionsEntry struct {
 	Plugin       string    `json:"plugin,omitempty"`
 	Timeout      int64     `json:"timeout,omitempty"`
 	Retries      int64     `json:"retries,omitempty"`
-	Req          string    `json:"req,omitempty"`
-	Attempts     int64     `json:"attempts,omitempty"`
+	Req          []byte    `json:"req,omitempty"`
+	Attempts     []byte    `json:"attempts,omitempty"`
 	StateStatus  int64     `json:"stateStatus,omitempty"`
 	StateStart   int64     `json:"stateStart,omitempty"`
 	StateEnd     int64     `json:"stateEnd,omitempty"`

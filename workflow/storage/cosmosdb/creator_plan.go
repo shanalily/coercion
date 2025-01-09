@@ -8,32 +8,10 @@ import (
 	"github.com/element-of-surprise/coercion/plugins"
 	"github.com/element-of-surprise/coercion/workflow"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/go-json-experiment/json"
 	"github.com/google/uuid"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
-
-const insertPlan = `
-	INSERT INTO plans (
-		id,
-		group_id,
-		name,
-		descr,
-		meta,
-		bypasschecks,
-		prechecks,
-		postchecks,
-		contchecks,
-		deferredchecks,
-		blocks,
-		state_status,
-		state_start,
-		state_end,
-		submit_time,
-		reason
-	) VALUES ($id, $group_id, $name, $descr, $meta, $bypasschecks, $prechecks, $postchecks, $contchecks, $deferredchecks,
-	$blocks, $state_status, $state_start, $state_end, $submit_time, $reason)`
 
 var zeroTime = time.Unix(0, 0)
 
@@ -43,20 +21,25 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		return fmt.Errorf("planToSQL: plan cannot be nil")
 	}
 
+	blocks, err := objsToIDs(p.Blocks)
+	if err != nil {
+		return fmt.Errorf("planToSQL(objsToIDs(blocks)): %w", err)
+	}
+
 	plan := plansEntry{
 		PartitionKey: u.cc.GetPKString(),
 		ID:           p.ID,
 		GroupID:      p.GroupID,
 		Name:         p.Name,
 		Descr:        p.Descr,
-		// meta: p.Meta,
-		StateStatus: int64(p.State.Status),
-		StateStart:  p.State.Start.UnixNano(),
-		StateEnd:    p.State.End.UnixNano(),
-		Reason:      int64(p.Reason),
+		Meta:         p.Meta,
+		Blocks:       blocks,
+		StateStatus:  int64(p.State.Status),
+		StateStart:   p.State.Start.UnixNano(),
+		StateEnd:     p.State.End.UnixNano(),
+		Reason:       int64(p.Reason),
 	}
 
-	// stmt.SetBytes("$meta", p.Meta)
 	if p.BypassChecks != nil {
 		plan.BypassChecks = p.BypassChecks.ID
 	}
@@ -73,32 +56,18 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		plan.DeferredChecks = p.DeferredChecks.ID
 	}
 
-	blocks, err := objsToIDs(p.Blocks)
-	if err != nil {
-		return fmt.Errorf("planToSQL(idsToStringSlice(blocks)): %w", err)
-	}
-	plan.Blocks = blocks
 	if p.SubmitTime.Before(zeroTime) {
 		plan.SubmitTime = zeroTime.UnixNano()
 	} else {
 		plan.SubmitTime = p.SubmitTime.UnixNano()
 	}
 
-	if err := u.commitChecks(ctx, p.ID, p.BypassChecks); err != nil {
-		return fmt.Errorf("planToSQL(commitChecks(bypasschecks)): %w", err)
+	for _, c := range [5]*workflow.Checks{p.BypassChecks, p.PreChecks, p.PostChecks, p.ContChecks, p.DeferredChecks} {
+		if err := u.commitChecks(ctx, p.ID, c); err != nil {
+			return fmt.Errorf("planToSQL(commitChecks): %w", err)
+		}
 	}
-	if err := u.commitChecks(ctx, p.ID, p.PreChecks); err != nil {
-		return fmt.Errorf("planToSQL(commitChecks(prechecks)): %w", err)
-	}
-	if err := u.commitChecks(ctx, p.ID, p.PostChecks); err != nil {
-		return fmt.Errorf("planToSQL(commitChecks(postchecks)): %w", err)
-	}
-	if err := u.commitChecks(ctx, p.ID, p.ContChecks); err != nil {
-		return fmt.Errorf("planToSQL(commitChecks(contchecks)): %w", err)
-	}
-	if err := u.commitChecks(ctx, p.ID, p.DeferredChecks); err != nil {
-		return fmt.Errorf("planToSQL(commitChecks(deferredchecks)): %w", err)
-	}
+
 	for i, b := range p.Blocks {
 		if err := u.commitBlock(ctx, p.ID, i, b); err != nil {
 			return fmt.Errorf("planToSQL(commitBlocks): %w", err)
@@ -114,27 +83,12 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
-	if err != nil {
+	if _, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
-	fmt.Println(res)
 
 	return nil
 }
-
-const insertChecks = `
-	INSERT INTO checks (
-		id,
-		key,
-		plan_id,
-		actions,
-		delay,
-		state_status,
-		state_start,
-		state_end
-	) VALUES ($id, $key, $plan_id, $actions, $delay,
-	$state_status, $state_start, $state_end)`
 
 func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow.Checks) error {
 	if c == nil {
@@ -150,14 +104,12 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 		ID:           c.ID,
 		Key:          c.Key,
 		PlanID:       planID,
-		// meta: p.Meta,
-		Actions: actions,
+		Actions:      actions,
+		Delay:        int64(c.Delay),
+		StateStatus:  int64(c.State.Status),
+		StateStart:   c.State.Start.UnixNano(),
+		StateEnd:     c.State.End.UnixNano(),
 	}
-
-	// stmt.SetInt64("$delay", int64(checks.Delay))
-	// stmt.SetInt64("$state_status", int64(checks.State.Status))
-	// stmt.SetInt64("$state_start", checks.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", checks.State.End.UnixNano())
 
 	for i, a := range c.Actions {
 		if err := u.commitAction(ctx, planID, i, a); err != nil {
@@ -172,40 +124,19 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.GetChecksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
-	if err != nil {
+	if _, err := u.cc.GetChecksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
-	fmt.Println(res)
 
 	return nil
 }
 
-const insertBlock = `
-	INSERT INTO blocks (
-		id,
-		key,
-		plan_id,
-		name,
-		descr,
-		pos,
-		entrancedelay,
-		exitdelay,
-		bypasschecks,
-		prechecks,
-		postchecks,
-		contchecks,
-		deferredchecks,
-		sequences,
-		concurrency,
-		toleratedfailures,
-		state_status,
-		state_start,
-		state_end
-	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $entrancedelay, $exitdelay, $bypasschecks, $prechecks, $postchecks, $contchecks, $deferredchecks,
-	$sequences, $concurrency, $toleratedfailures,$state_status, $state_start, $state_end)`
-
 func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *workflow.Block) error {
+	sequences, err := objsToIDs(b.Sequences)
+	if err != nil {
+		return fmt.Errorf("objsToIDs(sequences): %w", err)
+	}
+
 	block := blocksEntry{
 		PartitionKey:      u.cc.GetPKString(),
 		ID:                b.ID,
@@ -216,23 +147,12 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 		Pos:               int64(pos),
 		EntranceDelay:     int64(b.EntranceDelay),
 		ExitDelay:         int64(b.ExitDelay),
+		Sequences:         sequences,
 		Concurrency:       int64(b.Concurrency),
 		ToleratedFailures: int64(b.ToleratedFailures),
 		StateStatus:       int64(b.State.Status),
 		StateStart:        b.State.Start.UnixNano(),
 		StateEnd:          b.State.End.UnixNano(),
-		// meta: p.Meta,
-	}
-
-	for _, c := range [5]*workflow.Checks{b.BypassChecks, b.PreChecks, b.PostChecks, b.ContChecks, b.DeferredChecks} {
-		if err := u.commitChecks(ctx, planID, c); err != nil {
-			return fmt.Errorf("commitBlock(commitChecks): %w", err)
-		}
-	}
-
-	sequences, err := objsToIDs(b.Sequences)
-	if err != nil {
-		return fmt.Errorf("objsToIDs(sequences): %w", err)
 	}
 
 	if b.BypassChecks != nil {
@@ -250,7 +170,12 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 	if b.DeferredChecks != nil {
 		block.DeferredChecks = b.DeferredChecks.ID
 	}
-	block.Sequences = sequences
+
+	for _, c := range [5]*workflow.Checks{b.BypassChecks, b.PreChecks, b.PostChecks, b.ContChecks, b.DeferredChecks} {
+		if err := u.commitChecks(ctx, planID, c); err != nil {
+			return fmt.Errorf("commitBlock(commitChecks): %w", err)
+		}
+	}
 
 	for i, seq := range b.Sequences {
 		if err := u.commitSequence(ctx, planID, i, seq); err != nil {
@@ -265,28 +190,12 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
-	if err != nil {
+	if _, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
-	fmt.Println(res)
 
 	return nil
 }
-
-const insertSequence = `
-	INSERT INTO sequences (
-		id,
-		key,
-		plan_id,
-		name,
-		descr,
-		pos,
-		actions,
-		state_status,
-		state_start,
-		state_end
-	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $actions, $state_status, $state_start, $state_end)`
 
 func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
 	actions, err := objsToIDs(seq.Actions)
@@ -306,7 +215,6 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 		StateStatus:  int64(seq.State.Status),
 		StateStart:   seq.State.Start.UnixNano(),
 		StateEnd:     seq.State.End.UnixNano(),
-		// meta: p.Meta,
 	}
 
 	for i, a := range seq.Actions {
@@ -322,49 +230,23 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.GetSequencesClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
-	if err != nil {
+	if _, err := u.cc.GetSequencesClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
-	fmt.Println(res)
 
 	return nil
 }
 
-const insertAction = `
-	INSERT INTO actions (
-		id,
-		key,
-		plan_id,
-		name,
-		descr,
-		pos,
-		plugin,
-		timeout,
-		retries,
-		req,
-		attempts,
-		state_status,
-		state_start,
-		state_end
-	) VALUES ($id, $key, $plan_id, $name, $descr, $pos, $plugin, $timeout, $retries, $req, $attempts,
-	$state_status, $state_start, $state_end)`
-
 func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a *workflow.Action) error {
-	// stmt, err := conn.Prepare(insertAction)
-	// if err != nil {
-	// 	return err
-	// }
-
 	req, err := json.Marshal(a.Req)
 	if err != nil {
 		return fmt.Errorf("json.Marshal(req): %w", err)
 	}
 
-	// attempts, err := encodeAttempts(a.Attempts)
-	// if err != nil {
-	// 	return fmt.Errorf("can't encode action.Attempts: %w", err)
-	// }
+	attempts, err := encodeAttempts(a.Attempts)
+	if err != nil {
+		return fmt.Errorf("can't encode action.Attempts: %w", err)
+	}
 	action := actionsEntry{
 		PartitionKey: u.cc.GetPKString(),
 		ID:           a.ID,
@@ -373,29 +255,16 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 		Name:         a.Name,
 		Descr:        a.Descr,
 		Pos:          int64(pos),
-		Req:          string(req),
-		// Attempts: string(attempts),
-		StateStatus: int64(a.State.Status),
-		StateStart:  a.State.Start.UnixNano(),
-		StateEnd:    a.State.End.UnixNano(),
-		// meta: p.Meta,
+		Plugin:       a.Plugin,
+		Timeout:      int64(a.Timeout),
+		Retries:      int64(a.Retries),
+		Req:          req,
+		Attempts:     attempts,
+		StateStatus:  int64(a.State.Status),
+		StateStart:   a.State.Start.UnixNano(),
+		StateEnd:     a.State.End.UnixNano(),
 	}
 
-	// stmt.SetText("$plugin", action.Plugin)
-	// stmt.SetInt64("$timeout", int64(action.Timeout))
-	// stmt.SetInt64("$retries", int64(action.Retries))
-	// stmt.SetBytes("$req", req)
-	// if attempts != nil {
-	// 	stmt.SetBytes("$attempts", attempts)
-	// }
-	// stmt.SetInt64("$state_status", int64(action.State.Status))
-	// stmt.SetInt64("$state_start", action.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", action.State.End.UnixNano())
-
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return err
-	// }
 	itemOpt := &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
 	}
@@ -404,11 +273,9 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	res, err := u.cc.GetActionsClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt)
-	if err != nil {
+	if _, err := u.cc.GetActionsClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
-	fmt.Println(res)
 
 	return nil
 }
@@ -452,19 +319,6 @@ func decodeAttempts(rawAttempts []byte, plug plugins.Plugin) ([]*workflow.Attemp
 
 type ider interface {
 	GetID() uuid.UUID
-}
-
-func idsToJSON[T any](objs []T) ([]byte, error) {
-	ids := make([]string, 0, len(objs))
-	for _, o := range objs {
-		if ider, ok := any(o).(ider); ok {
-			id := ider.GetID()
-			ids = append(ids, id.String())
-		} else {
-			return nil, fmt.Errorf("idsToJSON: object %T does not implement ider", o)
-		}
-	}
-	return json.Marshal(ids)
 }
 
 func objsToIDs[T any](objs []T) ([]uuid.UUID, error) {

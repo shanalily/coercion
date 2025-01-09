@@ -12,9 +12,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
-// strToCheck reads a field from the statement and returns a workflow.Checks  object. stmt must be
+// idToCheck reads a field from the statement and returns a workflow.Checks  object. stmt must be
 // from a Plan or Block query.
-func (p reader) strToCheck(ctx context.Context, id uuid.UUID) (*workflow.Checks, error) {
+func (p reader) idToCheck(ctx context.Context, id uuid.UUID) (*workflow.Checks, error) {
 	if id == uuid.Nil {
 		return &workflow.Checks{}, nil
 	}
@@ -61,7 +61,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 	if err != nil {
 		return nil, fmt.Errorf("checksRowToChecks: %w", err)
 	}
-	c.Actions, err = p.strToActions(ctx, resp.Actions)
+	c.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get actions ids: %w", err)
 	}

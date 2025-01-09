@@ -11,8 +11,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
-// fieldToSequences converts the "sequences" field in a cosmosdb row to a list of workflow.Sequences.
-func (p reader) strToSequences(ctx context.Context, sequenceIDs []uuid.UUID) ([]*workflow.Sequence, error) {
+// idsToSequences converts the "sequences" field in a cosmosdb row to a list of workflow.Sequences.
+func (p reader) idsToSequences(ctx context.Context, sequenceIDs []uuid.UUID) ([]*workflow.Sequence, error) {
 	sequences := make([]*workflow.Sequence, 0, len(sequenceIDs))
 	for _, id := range sequenceIDs {
 		sequence, err := p.fetchSequenceByID(ctx, id)
@@ -59,7 +59,7 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get sequence state: %w", err)
 	}
-	s.Actions, err = p.strToActions(ctx, resp.Actions)
+	s.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read sequence actions: %w", err)
 	}

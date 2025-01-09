@@ -74,67 +74,43 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 	resultsStream := make(chan storage.Stream[storage.ListResult])
 	// results := make([]any, 0)
 	results := make([]storage.ListResult, 0)
-	for pager.More() {
-		res, err := pager.NextPage(ctx)
-		if err != nil {
-			resultsStream <- storage.Stream[storage.ListResult]{
-				Err: err,
-			}
-			return resultsStream, err
-		}
-		for _, item := range res.Items {
-			result, err := r.listResultsFunc(item)
+	go func() {
+		defer close(resultsStream)
+		// need to check for ctx timeout
+		for pager.More() {
+			res, err := pager.NextPage(ctx)
 			if err != nil {
 				resultsStream <- storage.Stream[storage.ListResult]{
-					Err: err,
+					Err: fmt.Errorf("problem listing plans: %w", err),
 				}
-				return resultsStream, fmt.Errorf("problem listing plans: %w", err)
+				return
 			}
-			results = append(results, result)
+			for _, item := range res.Items {
+				result, err := r.listResultsFunc(item)
+				if err != nil {
+					resultsStream <- storage.Stream[storage.ListResult]{
+						Err: fmt.Errorf("problem listing items in plans: %w", err),
+					}
+					return
+				}
+				results = append(results, result)
+			}
 		}
-	}
 
-	// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
-	for _, r := range results {
-		resultsStream <- storage.Stream[storage.ListResult]{Result: r}
-	}
-
-	// go func() {
-	// 	err := cosmosdbx.Execute(
-	// 		conn,
-	// 		q,
-	// 		&cosmosdbx.ExecOptions{
-	// 			Args:  args,
-	// 			Named: named,
-	// 			ResultFunc: func(stmt *cosmosdb.Stmt) error {
-	// 				r, err := r.listResultsFunc(stmt)
-	// 				if err != nil {
-	// 					return fmt.Errorf("problem searching plans: %w", err)
-	// 				}
-	// 				select {
-	// 				case <-ctx.Done():
-	// 					results <- storage.Stream[storage.ListResult]{
-	// 						Err: ctx.Err(),
-	// 					}
-	// 					return ctx.Err()
-	// 				case results <- storage.Stream[storage.ListResult]{Result: r}:
-	// 					return nil
-	// 				}
-	// 			},
-	// 		},
-	// 	)
-
-	// 	if err != nil {
-	// 		results <- storage.Stream[storage.ListResult]{Err: fmt.Errorf("couldn't complete list plans: %w", err)}
-	// 	}
-	// }()
+		// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
+		for _, r := range results {
+			resultsStream <- storage.Stream[storage.ListResult]{Result: r}
+		}
+		return
+	}()
 	return resultsStream, nil
 }
 
 func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.QueryParameter) {
 	parameters := []azcosmos.QueryParameter{}
 
-	const sel = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans WHERE`
+	// const sel = `SELECT id, groupID, name, descr, submitTime, stateStatus, stateStart, stateEnd FROM plans WHERE`
+	const sel = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p WHERE`
 
 	build := strings.Builder{}
 	build.WriteString(sel)
@@ -144,14 +120,14 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 	if len(filters.ByIDs) > 0 {
 		numFilters++
 		// ARRAY_CONTAINS(@ids, id) instead? I'm not sure is IN and $ids will work with params struct
-		build.WriteString(" id IN @ids")
+		build.WriteString(" ARRAY_CONTAINS(@ids, p.id)")
 	}
 	if len(filters.ByGroupIDs) > 0 {
 		if numFilters > 0 {
 			build.WriteString(" AND")
 		}
 		numFilters++
-		build.WriteString(" group_id IN @group_ids")
+		build.WriteString(" groupID IN @group_ids")
 	}
 	if len(filters.ByStatus) > 0 {
 		if numFilters > 0 {
@@ -162,9 +138,9 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 			name := fmt.Sprintf("$status%d", i)
 			// named[name] = int64(s)
 			if i == 0 {
-				build.WriteString(fmt.Sprintf(" state_status = %s", name))
+				build.WriteString(fmt.Sprintf(" stateStatus = %s", name))
 			} else {
-				build.WriteString(fmt.Sprintf(" AND state_status = %s", name))
+				build.WriteString(fmt.Sprintf(" AND stateStatus = %s", name))
 			}
 			parameters = append(parameters, azcosmos.QueryParameter{
 				Name:  "@status",
@@ -172,7 +148,7 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 			})
 		}
 	}
-	build.WriteString(" ORDER BY submit_time DESC;")
+	// build.WriteString(" ORDER BY submitTime DESC;")
 	query := build.String()
 
 	if len(filters.ByIDs) > 0 {
@@ -202,66 +178,45 @@ func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.Qu
 // entrie to return
 func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storage.ListResult], error) {
 	// list all plans without parameters
-	const listPlans = `SELECT id, group_id, name, descr, submit_time, state_status, state_start, state_end FROM plans ORDER BY submit_time DESC`
+	// const listPlans = `SELECT id, groupID, name, descr, submitTime, stateStatus, stateStart, stateEnd FROM plans ORDER BY submitTime DESC`
+	// can I list by submitTime without indexing?
+	const listPlans = `SELECT p.id, p.groupID, p.name, p.descr, p.submitTime, p.stateStatus, p.stateStart, p.stateEnd FROM plans p ORDER BY p.stateStart DESC`
 
-	named := map[string]any{}
-
+	// does this work with cosmosdb
 	q := listPlans
 	if limit > 0 {
 		q += " LIMIT $limit;"
-		named["$limit"] = limit
 	}
 
 	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
-	// results := make(chan storage.Stream[storage.ListResult], 1)
 	resultsStream := make(chan storage.Stream[storage.ListResult])
-	// results := make([]any, 0)
 	results := make([]storage.ListResult, 0)
-	for pager.More() {
-		res, err := pager.NextPage(ctx)
-		if err != nil {
-			resultsStream <- storage.Stream[storage.ListResult]{
-				Err: err,
-			}
-			return resultsStream, err
-		}
-		for _, item := range res.Items {
-			result, err := r.listResultsFunc(item)
+	go func() {
+		defer close(resultsStream)
+		for pager.More() {
+			res, err := pager.NextPage(ctx)
 			if err != nil {
 				resultsStream <- storage.Stream[storage.ListResult]{
-					Err: err,
+					Err: fmt.Errorf("problem listing plans: %w", err),
 				}
-				return resultsStream, fmt.Errorf("problem listing plans: %w", err)
+				return
 			}
-			results = append(results, result)
+			for _, item := range res.Items {
+				result, err := r.listResultsFunc(item)
+				if err != nil {
+					resultsStream <- storage.Stream[storage.ListResult]{
+						Err: fmt.Errorf("problem listing items in plans: %w", err),
+					}
+					return
+				}
+				results = append(results, result)
+			}
 		}
-	}
 
-	// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
-	for _, r := range results {
-		resultsStream <- storage.Stream[storage.ListResult]{Result: r}
-	}
-
-	// results := make(chan storage.Stream[storage.ListResult], 1)
-	// go func() {
-	// 		result, err := r.listResultsFunc(stmt)
-	// 		if err != nil {
-	// 			return fmt.Errorf("problem listing plans: %w", err)
-	// 		}
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			results <- storage.Stream[storage.ListResult]{
-	// 				Err: ctx.Err(),
-	// 			}
-	// 			return ctx.Err()
-	// 		case results <- storage.Stream[storage.ListResult]{Result: result}:
-	// 			return nil
-	// 		}
-
-	// 	if err != nil {
-	// 		results <- storage.Stream[storage.ListResult]{Err: fmt.Errorf("couldn't complete list plans: %w", err)}
-	// 	}
-	// }()
+		for _, r := range results {
+			resultsStream <- storage.Stream[storage.ListResult]{Result: r}
+		}
+	}()
 	return resultsStream, nil
 }
 

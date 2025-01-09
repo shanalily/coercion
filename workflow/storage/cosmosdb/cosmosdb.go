@@ -150,12 +150,12 @@ func (c *CosmosDBClient) containers() []container {
 				c.plansClient = cc
 			},
 			indexPaths: []azcosmos.IncludedPath{
-				// pathToScalar("id"),
 				pathToScalar("groupID"),
 				pathToScalar("stateStatus"),
 				pathToScalar("stateStart"),
 				pathToScalar("stateEnd"),
 				pathToScalar("reason"),
+				// submitTime?
 			},
 		},
 		{
@@ -164,7 +164,6 @@ func (c *CosmosDBClient) containers() []container {
 				c.blocksClient = cc
 			},
 			indexPaths: []azcosmos.IncludedPath{
-				// pathToScalar("id"),
 				pathToScalar("key"),
 				pathToScalar("planID"),
 				pathToScalar("stateStatus"),
@@ -178,7 +177,6 @@ func (c *CosmosDBClient) containers() []container {
 				c.checksClient = cc
 			},
 			indexPaths: []azcosmos.IncludedPath{
-				// pathToScalar("id"),
 				pathToScalar("key"),
 				pathToScalar("planID"),
 				pathToScalar("stateStatus"),

@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/element-of-surprise/coercion/plugins/registry"
 	"github.com/element-of-surprise/coercion/workflow"
+	"github.com/element-of-surprise/coercion/workflow/storage"
 	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb"
 	"github.com/google/uuid"
 )
@@ -109,19 +110,41 @@ func main() {
 				State: &workflow.State{},
 			},
 		},
-		State: &workflow.State{},
+		State:      &workflow.State{},
+		SubmitTime: time.Now(),
 	}
 
 	if err := vault.Create(ctx, plan); err != nil {
 		fatalErr(logger, "Failed to create plan entry: %v", err)
 	}
 
-	// results, err := vault.List(context.Background(), 0);
-	// if err != nil {
-	// 	fatalErr(logger, "Failed to list plan entries: %v", err)
-	// }
-	// res := <-results
-	// fmt.Println(res)
+	results, err := vault.List(context.Background(), 0)
+	if err != nil {
+		fatalErr(logger, "Failed to list plan entries: %v", err)
+	}
+	for res := range results {
+		fmt.Println(res)
+		if res.Err != nil {
+			break
+		}
+	}
+
+	filters := storage.Filters{
+		ByIDs: []uuid.UUID{
+			planID,
+		},
+	}
+	results, err = vault.Search(context.Background(), filters)
+	if err != nil {
+		fatalErr(logger, "Failed to list plan entries: %v", err)
+	}
+	for res := range results {
+		fmt.Println(res)
+		if res.Err != nil {
+			break
+		}
+	}
+
 	result, err := vault.Read(ctx, planID)
 	if err != nil {
 		fatalErr(logger, "Failed to read plan entry: %v", err)

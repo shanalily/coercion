@@ -2,14 +2,13 @@ package cosmosdb
 
 import (
 	"context"
-	// "fmt"
+	"fmt"
 	"sync"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.BlockUpdater = blockUpdater{}
@@ -18,6 +17,7 @@ var _ storage.BlockUpdater = blockUpdater{}
 type blockUpdater struct {
 	mu *sync.Mutex
 	cc ContainerClient
+	pk azcosmos.PartitionKey
 
 	private.Storage
 }
@@ -27,26 +27,27 @@ func (b blockUpdater) UpdateBlock(ctx context.Context, block *workflow.Block) er
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// conn, err := b.pool.Take(context.WithoutCancel(ctx))
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't get a connection from the pool: %w", err)
-	// }
-	// defer b.pool.Put(conn)
+	patch := azcosmos.PatchOperations{}
+	patch.AppendReplace("/stateStatus", int64(block.State.Status))
+	patch.AppendReplace("/stateStart", block.State.Start.UnixNano())
+	patch.AppendReplace("/stateEnd", block.State.End.UnixNano())
 
-	// stmt, err := conn.Prepare(updateBlock)
-	// if err != nil {
-	// 	return fmt.Errorf("BlockWriter.Write: %w", err)
+	// var ifMatchEtag *azcore.ETag = nil
+	// if etag, ok := h.GetEtag(item); ok {
+	// 	ifMatchEtag = (*azcore.ETag)(&etag)
 	// }
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+		// IfMatchEtag:                  ifMatchEtag,
+	}
 
-	// stmt.SetText("$id", action.ID.String())
-	// stmt.SetInt64("$state_status", int64(action.State.Status))
-	// stmt.SetInt64("$state_start", action.State.Start.UnixNano())
-	// stmt.SetInt64("$state_end", action.State.End.UnixNano())
-
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("BlockWriter.Write: %w", err)
-	// }
+	// save the item into Cosmos DB
+	res, err := b.cc.PatchItem(ctx, b.pk, block.ID.String(), patch, itemOpt)
+	if err != nil {
+		// return fmt.Errorf("failed to update item through Cosmos DB API: %w", cosmosErr(err))
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+	fmt.Println(res.ETag)
 
 	return nil
 }

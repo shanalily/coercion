@@ -65,6 +65,7 @@ type ContainerClient interface {
 	Read(context.Context, *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error)
 	ReadItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
+	PatchItem(context.Context, azcosmos.PartitionKey, string, azcosmos.PatchOperations, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 }
 
 func partitionKey(val string) azcosmos.PartitionKey {

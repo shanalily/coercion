@@ -27,6 +27,11 @@ func (c checksUpdater) UpdateChecks(ctx context.Context, check *workflow.Checks)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// checks, err := checkToEntry(ctx, u.cc.GetPKString(), planID, c)
+	// if err != nil {
+	// 	return err
+	// }
+
 	// conn, err := c.pool.Take(context.WithoutCancel(ctx))
 	// if err != nil {
 	// 	return fmt.Errorf("couldn't get a connection from the pool: %w", err)

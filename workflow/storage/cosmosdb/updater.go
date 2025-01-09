@@ -24,7 +24,7 @@ type updater struct {
 
 func newUpdater(mu *sync.Mutex, cc *CosmosDBClient) updater {
 	return updater{
-		planUpdater:     planUpdater{mu: mu, cc: cc.GetPlansClient()},
+		planUpdater:     planUpdater{mu: mu, cc: cc.GetPlansClient(), pk: cc.GetPKString()},
 		checksUpdater:   checksUpdater{mu: mu, cc: cc.GetChecksClient()},
 		blockUpdater:    blockUpdater{mu: mu, cc: cc.GetBlocksClient()},
 		sequenceUpdater: sequenceUpdater{mu: mu, cc: cc.GetSequencesClient()},

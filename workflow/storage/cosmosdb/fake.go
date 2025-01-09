@@ -169,6 +169,10 @@ func (cc FakeContainerClient) ReplaceItem(ctx context.Context, partitionKey azco
 	return azcosmos.ItemResponse{}, cc.UpdateErr
 }
 
+func (cc FakeContainerClient) PatchItem(ctx context.Context, partitionKey azcosmos.PartitionKey, itemId string, ops azcosmos.PatchOperations, o *azcosmos.ItemOptions) (azcosmos.ItemResponse, error) {
+	return azcosmos.ItemResponse{}, cc.UpdateErr
+}
+
 // func (cc FakeContainerClient) DeleteItem(ctx context.Context, p string) error {
 func (cc FakeContainerClient) DeleteItem(ctx context.Context, partitionKey azcosmos.PartitionKey, itemId string, o *azcosmos.ItemOptions) (azcosmos.ItemResponse, error) {
 	cc.mu.Lock()

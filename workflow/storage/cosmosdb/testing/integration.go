@@ -273,6 +273,22 @@ func main() {
 		fatalErr(logger, "Failed to read plan entry: %v", err)
 	}
 	fmt.Println(result)
+
+	// fmt.Println(plan.Reason)
+	fmt.Println(result.State.Status)
+	fmt.Println(plan.State.Status)
+	plan.State.Status = workflow.Completed
+
+	if err := vault.UpdatePlan(ctx, plan); err != nil {
+		fatalErr(logger, "Failed to update plan entry: %v", err)
+	}
+
+	result, err = vault.Read(ctx, planID)
+	if err != nil {
+		fatalErr(logger, "Failed to read plan entry: %v", err)
+	}
+	fmt.Println(result)
+	fmt.Println(result.State.Status)
 }
 
 // msiCred returns a managed identity credential.

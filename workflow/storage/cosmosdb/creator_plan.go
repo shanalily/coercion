@@ -17,17 +17,51 @@ var zeroTime = time.Unix(0, 0)
 
 // commitPlan commits a plan to the database. This commits the entire plan and all sub-objects.
 func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
+	plan, err := planToEntry(ctx, u.cc.GetPKString(), p)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range [5]*workflow.Checks{p.BypassChecks, p.PreChecks, p.PostChecks, p.ContChecks, p.DeferredChecks} {
+		if err := u.commitChecks(ctx, p.ID, c); err != nil {
+			return fmt.Errorf("planToEntry(commitChecks): %w", err)
+		}
+	}
+
+	for i, b := range p.Blocks {
+		if err := u.commitBlock(ctx, p.ID, i, b); err != nil {
+			return fmt.Errorf("planToEntry(commitBlocks): %w", err)
+		}
+	}
+
+	// save the JSON format document into Cosmos DB.
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(plan)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
+
+	if _, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+
+	return nil
+}
+
+func planToEntry(ctx context.Context, pk string, p *workflow.Plan) (plansEntry, error) {
 	if p == nil {
-		return fmt.Errorf("planToSQL: plan cannot be nil")
+		return plansEntry{}, fmt.Errorf("planToEntry: plan cannot be nil")
 	}
 
 	blocks, err := objsToIDs(p.Blocks)
 	if err != nil {
-		return fmt.Errorf("planToSQL(objsToIDs(blocks)): %w", err)
+		return plansEntry{}, fmt.Errorf("planToEntry(objsToIDs(blocks)): %w", err)
 	}
 
 	plan := plansEntry{
-		PartitionKey: u.cc.GetPKString(),
+		PartitionKey: pk,
 		ID:           p.ID,
 		GroupID:      p.GroupID,
 		Name:         p.Name,
@@ -62,32 +96,7 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 		plan.SubmitTime = p.SubmitTime.UnixNano()
 	}
 
-	for _, c := range [5]*workflow.Checks{p.BypassChecks, p.PreChecks, p.PostChecks, p.ContChecks, p.DeferredChecks} {
-		if err := u.commitChecks(ctx, p.ID, c); err != nil {
-			return fmt.Errorf("planToSQL(commitChecks): %w", err)
-		}
-	}
-
-	for i, b := range p.Blocks {
-		if err := u.commitBlock(ctx, p.ID, i, b); err != nil {
-			return fmt.Errorf("planToSQL(commitBlocks): %w", err)
-		}
-	}
-
-	// save the JSON format document into Cosmos DB.
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
-	itemJson, err := json.Marshal(plan)
-	if err != nil {
-		return fmt.Errorf("failed to marshal item: %w", err)
-	}
-
-	if _, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
-	}
-
-	return nil
+	return plan, nil
 }
 
 func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow.Checks) error {
@@ -95,20 +104,9 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 		return nil
 	}
 
-	actions, err := objsToIDs(c.Actions)
+	checks, err := checkToEntry(ctx, u.cc.GetPKString(), planID, c)
 	if err != nil {
-		return fmt.Errorf("objsToIDs(checks.Actions): %w", err)
-	}
-	checks := checksEntry{
-		PartitionKey: u.cc.GetPKString(),
-		ID:           c.ID,
-		Key:          c.Key,
-		PlanID:       planID,
-		Actions:      actions,
-		Delay:        int64(c.Delay),
-		StateStatus:  int64(c.State.Status),
-		StateStart:   c.State.Start.UnixNano(),
-		StateEnd:     c.State.End.UnixNano(),
+		return err
 	}
 
 	for i, a := range c.Actions {
@@ -131,14 +129,68 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 	return nil
 }
 
+func checkToEntry(ctx context.Context, pk string, planID uuid.UUID, c *workflow.Checks) (checksEntry, error) {
+	if c == nil {
+		return checksEntry{}, nil
+	}
+
+	actions, err := objsToIDs(c.Actions)
+	if err != nil {
+		return checksEntry{}, fmt.Errorf("objsToIDs(checks.Actions): %w", err)
+	}
+	return checksEntry{
+		PartitionKey: pk,
+		ID:           c.ID,
+		Key:          c.Key,
+		PlanID:       planID,
+		Actions:      actions,
+		Delay:        int64(c.Delay),
+		StateStatus:  int64(c.State.Status),
+		StateStart:   c.State.Start.UnixNano(),
+		StateEnd:     c.State.End.UnixNano(),
+	}, nil
+}
+
 func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *workflow.Block) error {
+	block, err := blockToEntry(ctx, u.cc.GetPKString(), planID, pos, b)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range [5]*workflow.Checks{b.BypassChecks, b.PreChecks, b.PostChecks, b.ContChecks, b.DeferredChecks} {
+		if err := u.commitChecks(ctx, planID, c); err != nil {
+			return fmt.Errorf("commitBlock(commitChecks): %w", err)
+		}
+	}
+
+	for i, seq := range b.Sequences {
+		if err := u.commitSequence(ctx, planID, i, seq); err != nil {
+			return fmt.Errorf("(commitSequence: %w", err)
+		}
+	}
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+	itemJson, err := json.Marshal(block)
+	if err != nil {
+		return fmt.Errorf("failed to marshal item: %w", err)
+	}
+
+	if _, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+	}
+
+	return nil
+}
+
+func blockToEntry(ctx context.Context, pk string, planID uuid.UUID, pos int, b *workflow.Block) (blocksEntry, error) {
 	sequences, err := objsToIDs(b.Sequences)
 	if err != nil {
-		return fmt.Errorf("objsToIDs(sequences): %w", err)
+		return blocksEntry{}, fmt.Errorf("objsToIDs(sequences): %w", err)
 	}
 
 	block := blocksEntry{
-		PartitionKey:      u.cc.GetPKString(),
+		PartitionKey:      pk,
 		ID:                b.ID,
 		Key:               b.Key,
 		PlanID:            planID,
@@ -170,31 +222,7 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 	if b.DeferredChecks != nil {
 		block.DeferredChecks = b.DeferredChecks.ID
 	}
-
-	for _, c := range [5]*workflow.Checks{b.BypassChecks, b.PreChecks, b.PostChecks, b.ContChecks, b.DeferredChecks} {
-		if err := u.commitChecks(ctx, planID, c); err != nil {
-			return fmt.Errorf("commitBlock(commitChecks): %w", err)
-		}
-	}
-
-	for i, seq := range b.Sequences {
-		if err := u.commitSequence(ctx, planID, i, seq); err != nil {
-			return fmt.Errorf("(commitSequence: %w", err)
-		}
-	}
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
-	itemJson, err := json.Marshal(block)
-	if err != nil {
-		return fmt.Errorf("failed to marshal item: %w", err)
-	}
-
-	if _, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
-	}
-
-	return nil
+	return block, nil
 }
 
 func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
@@ -219,7 +247,7 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 
 	for i, a := range seq.Actions {
 		if err := u.commitAction(ctx, planID, i, a); err != nil {
-			return fmt.Errorf("planToSQL(commitAction): %w", err)
+			return fmt.Errorf("planToEntry(commitAction): %w", err)
 		}
 	}
 	itemOpt := &azcosmos.ItemOptions{

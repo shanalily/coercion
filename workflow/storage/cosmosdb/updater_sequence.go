@@ -29,9 +29,9 @@ func (s sequenceUpdater) UpdateSequence(ctx context.Context, seq *workflow.Seque
 	defer s.mu.Unlock()
 
 	patch := azcosmos.PatchOperations{}
-	patch.AppendReplace("/stateStatus", int64(seq.State.Status))
-	patch.AppendReplace("/stateStart", seq.State.Start.UnixNano())
-	patch.AppendReplace("/stateEnd", seq.State.End.UnixNano())
+	patch.AppendReplace("/stateStatus", seq.State.Status)
+	patch.AppendReplace("/stateStart", seq.State.Start)
+	patch.AppendReplace("/stateEnd", seq.State.End)
 
 	// var ifMatchEtag *azcore.ETag = nil
 	// if etag, ok := h.GetEtag(item); ok {

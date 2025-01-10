@@ -1,197 +1,97 @@
 package cosmosdb
 
 import (
+	"time"
+
+	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
 )
-
-var tables = []string{
-	planSchema,
-	blocksSchema,
-	checksSchema,
-	sequencesSchema,
-	actionsSchema,
-}
 
 // type BypassChecks uuid.UUID
 
 type plansEntry struct {
-	PartitionKey   string      `json:"partitionKey,omitempty"`
-	ID             uuid.UUID   `json:"id,omitempty"`
-	GroupID        uuid.UUID   `json:"groupID,omitempty"`
-	Name           string      `json:"name,omitempty"`
-	Descr          string      `json:"descr,omitempty"`
-	Meta           []byte      `json:"meta,omitempty"`
-	BypassChecks   uuid.UUID   `json:"bypassChecks,omitempty"`
-	PreChecks      uuid.UUID   `json:"preChecks,omitempty"`
-	PostChecks     uuid.UUID   `json:"postChecks,omitempty"`
-	ContChecks     uuid.UUID   `json:"contChecks,omitempty"`
-	DeferredChecks uuid.UUID   `json:"deferredChecks,omitempty"`
-	Blocks         []uuid.UUID `json:"blocks,omitempty"`
-	StateStatus    int64       `json:"stateStatus,omitempty"`
-	StateStart     int64       `json:"stateStart,omitempty"`
-	StateEnd       int64       `json:"stateEnd,omitempty"`
-	SubmitTime     int64       `json:"submitTime,omitempty"`
-	Reason         int64       `json:"reason,omitempty"`
+	PartitionKey   string                 `json:"partitionKey,omitempty"`
+	ID             uuid.UUID              `json:"id,omitempty"`
+	GroupID        uuid.UUID              `json:"groupID,omitempty"`
+	Name           string                 `json:"name,omitempty"`
+	Descr          string                 `json:"descr,omitempty"`
+	Meta           []byte                 `json:"meta,omitempty"`
+	BypassChecks   uuid.UUID              `json:"bypassChecks,omitempty"`
+	PreChecks      uuid.UUID              `json:"preChecks,omitempty"`
+	PostChecks     uuid.UUID              `json:"postChecks,omitempty"`
+	ContChecks     uuid.UUID              `json:"contChecks,omitempty"`
+	DeferredChecks uuid.UUID              `json:"deferredChecks,omitempty"`
+	Blocks         []uuid.UUID            `json:"blocks,omitempty"`
+	StateStatus    workflow.Status        `json:"stateStatus,omitempty"`
+	StateStart     time.Time              `json:"stateStart,omitempty"`
+	StateEnd       time.Time              `json:"stateEnd,omitempty"`
+	SubmitTime     time.Time              `json:"submitTime,omitempty"`
+	Reason         workflow.FailureReason `json:"reason,omitempty"`
 }
-
-var planSchema = `
-CREATE Table If Not Exists plans (
-	id TEXT PRIMARY KEY,
-	group_id TEXT NOT NULL,
-	name TEXT NOT NULL,
-	descr TEXT NOT NULL,
-	meta BLOB,
-	bypasschecks TEXT,
-	prechecks TEXT,
-	postchecks TEXT,
-	contchecks TEXT,
-	deferredchecks TEXT,
-	blocks BLOB NOT NULL,
-	state_status INTEGER NOT NULL,
-	state_start INTEGER NOT NULL,
-	state_end INTEGER NOT NULL,
-	submit_time INTEGER NOT NULL,
-	reason INTEGER
-);`
 
 type blocksEntry struct {
-	PartitionKey      string      `json:"partitionKey,omitempty"`
-	ID                uuid.UUID   `json:"id,omitempty"`
-	Key               uuid.UUID   `json:"key,omitempty"`
-	PlanID            uuid.UUID   `json:"planID,omitempty"`
-	Name              string      `json:"name,omitempty"`
-	Descr             string      `json:"descr,omitempty"`
-	Pos               int64       `json:"pos,omitempty"`
-	EntranceDelay     int64       `json:"entranceDelay,omitempty"`
-	ExitDelay         int64       `json:"exitDelay,omitempty"`
-	BypassChecks      uuid.UUID   `json:"bypassChecks,omitempty"`
-	PreChecks         uuid.UUID   `json:"preChecks,omitempty"`
-	PostChecks        uuid.UUID   `json:"postChecks,omitempty"`
-	ContChecks        uuid.UUID   `json:"contChecks,omitempty"`
-	DeferredChecks    uuid.UUID   `json:"deferredChecks,omitempty"`
-	Sequences         []uuid.UUID `json:"sequences,omitempty"`
-	Concurrency       int64       `json:"concurrency,omitempty"`
-	ToleratedFailures int64       `json:"toleratedFailures,omitempty"`
-	StateStatus       int64       `json:"stateStatus,omitempty"`
-	StateStart        int64       `json:"stateStart,omitempty"`
-	StateEnd          int64       `json:"stateEnd,omitempty"`
+	PartitionKey      string          `json:"partitionKey,omitempty"`
+	ID                uuid.UUID       `json:"id,omitempty"`
+	Key               uuid.UUID       `json:"key,omitempty"`
+	PlanID            uuid.UUID       `json:"planID,omitempty"`
+	Name              string          `json:"name,omitempty"`
+	Descr             string          `json:"descr,omitempty"`
+	Pos               int             `json:"pos,omitempty"`
+	EntranceDelay     time.Duration   `json:"entranceDelay,omitempty"`
+	ExitDelay         time.Duration   `json:"exitDelay,omitempty"`
+	BypassChecks      uuid.UUID       `json:"bypassChecks,omitempty"`
+	PreChecks         uuid.UUID       `json:"preChecks,omitempty"`
+	PostChecks        uuid.UUID       `json:"postChecks,omitempty"`
+	ContChecks        uuid.UUID       `json:"contChecks,omitempty"`
+	DeferredChecks    uuid.UUID       `json:"deferredChecks,omitempty"`
+	Sequences         []uuid.UUID     `json:"sequences,omitempty"`
+	Concurrency       int             `json:"concurrency,omitempty"`
+	ToleratedFailures int             `json:"toleratedFailures,omitempty"`
+	StateStatus       workflow.Status `json:"stateStatus,omitempty"`
+	StateStart        time.Time       `json:"stateStart,omitempty"`
+	StateEnd          time.Time       `json:"stateEnd,omitempty"`
 }
-
-var blocksSchema = `
-CREATE Table If Not Exists blocks (
-    id TEXT PRIMARY KEY,
-    key TEXT,
-    plan_id BLOB NOT NULL,
-    name TEXT NOT NULL,
-    descr TEXT NOT NULL,
-    pos INTEGER NOT NULL,
-    entrancedelay INTEGER NOT NULL,
-    exitdelay INTEGER NOT NULL,
-    bypasschecks TEXT,
-    prechecks TEXT,
-    postchecks TEXT,
-    contchecks TEXT,
-    deferredchecks TEXT,
-    sequences BLOB NOT NULL,
-    concurrency INTEGER NOT NULL,
-    toleratedfailures INTEGER NOT NULL,
-    state_status INTEGER NOT NULL,
-    state_start INTEGER NOT NULL,
-    state_end INTEGER NOT NULL
-);`
 
 type checksEntry struct {
-	PartitionKey string      `json:"partitionKey,omitempty"`
-	ID           uuid.UUID   `json:"id,omitempty"`
-	Key          uuid.UUID   `json:"key,omitempty"`
-	PlanID       uuid.UUID   `json:"planID,omitempty"`
-	Actions      []uuid.UUID `json:"actions,omitempty"`
-	Delay        int64       `json:"delay,omitempty"`
-	StateStatus  int64       `json:"stateStatus,omitempty"`
-	StateStart   int64       `json:"stateStart,omitempty"`
-	StateEnd     int64       `json:"stateEnd,omitempty"`
+	PartitionKey string          `json:"partitionKey,omitempty"`
+	ID           uuid.UUID       `json:"id,omitempty"`
+	Key          uuid.UUID       `json:"key,omitempty"`
+	PlanID       uuid.UUID       `json:"planID,omitempty"`
+	Actions      []uuid.UUID     `json:"actions,omitempty"`
+	Delay        time.Duration   `json:"delay,omitempty"`
+	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
+	StateStart   time.Time       `json:"stateStart,omitempty"`
+	StateEnd     time.Time       `json:"stateEnd,omitempty"`
 }
-
-var checksSchema = `
-CREATE Table If Not Exists checks (
-    id TEXT PRIMARY KEY,
-    key TEXT,
-    plan_id TEXT NOT NULL,
-    actions BLOB NOT NULL,
-    delay INTEGER NOT NULL,
-    state_status INTEGER NOT NULL,
-    state_start INTEGER NOT NULL,
-    state_end INTEGER NOT NULL
-);`
 
 type sequencesEntry struct {
-	PartitionKey string      `json:"partitionKey,omitempty"`
-	ID           uuid.UUID   `json:"id,omitempty"`
-	Key          uuid.UUID   `json:"key,omitempty"`
-	PlanID       uuid.UUID   `json:"planID,omitempty"`
-	Name         string      `json:"name,omitempty"`
-	Descr        string      `json:"descr,omitempty"`
-	Pos          int64       `json:"pos,omitempty"`
-	Actions      []uuid.UUID `json:"actions,omitempty"`
-	StateStatus  int64       `json:"stateStatus,omitempty"`
-	StateStart   int64       `json:"stateStart,omitempty"`
-	StateEnd     int64       `json:"stateEnd,omitempty"`
+	PartitionKey string          `json:"partitionKey,omitempty"`
+	ID           uuid.UUID       `json:"id,omitempty"`
+	Key          uuid.UUID       `json:"key,omitempty"`
+	PlanID       uuid.UUID       `json:"planID,omitempty"`
+	Name         string          `json:"name,omitempty"`
+	Descr        string          `json:"descr,omitempty"`
+	Pos          int             `json:"pos,omitempty"`
+	Actions      []uuid.UUID     `json:"actions,omitempty"`
+	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
+	StateStart   time.Time       `json:"stateStart,omitempty"`
+	StateEnd     time.Time       `json:"stateEnd,omitempty"`
 }
-
-var sequencesSchema = `
-CREATE Table If Not Exists sequences (
-    id TEXT PRIMARY KEY,
-    key TEXT,
-    plan_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    descr TEXT NOT NULL,
-    pos INTEGER NOT NULL,
-    actions BLOB NOT NULL,
-    state_status INTEGER NOT NULL,
-    state_start INTEGER NOT NULL,
-    state_end INTEGER NOT NULL
-);`
 
 type actionsEntry struct {
-	PartitionKey string    `json:"partitionKey,omitempty"`
-	ID           uuid.UUID `json:"id,omitempty"`
-	Key          uuid.UUID `json:"key,omitempty"`
-	PlanID       uuid.UUID `json:"planID,omitempty"`
-	Name         string    `json:"name,omitempty"`
-	Descr        string    `json:"descr,omitempty"`
-	Pos          int64     `json:"pos,omitempty"`
-	Plugin       string    `json:"plugin,omitempty"`
-	Timeout      int64     `json:"timeout,omitempty"`
-	Retries      int64     `json:"retries,omitempty"`
-	Req          []byte    `json:"req,omitempty"`
-	Attempts     []byte    `json:"attempts,omitempty"`
-	StateStatus  int64     `json:"stateStatus,omitempty"`
-	StateStart   int64     `json:"stateStart,omitempty"`
-	StateEnd     int64     `json:"stateEnd,omitempty"`
-}
-
-var actionsSchema = `
-CREATE Table If Not Exists actions (
-    id TEXT PRIMARY KEY,
-    key TEXT,
-    plan_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    descr TEXT NOT NULL,
-    pos INTEGER NOT NULL,
-    plugin TEXT NOT NULL,
-    timeout INTEGER NOT NULL,
-    retries INTEGER NOT NULL,
-    req BLOB,
-    attempts BLOB,
-    state_status INTEGER NOT NULL,
-    state_start INTEGER NOT NULL,
-    state_end INTEGER NOT NULL
-);`
-
-var indexes = []string{
-	`CREATE INDEX If Not Exists idx_plans ON plans(id, group_id, state_status, state_start, state_end, reason);`,
-	`CREATE INDEX If Not Exists idx_blocks ON blocks(id, key, plan_id, state_status, state_start, state_end);`,
-	`CREATE INDEX If Not Exists idx_checks ON checks(id, key, plan_id, state_status, state_start, state_end);`,
-	`CREATE INDEX If Not Exists idx_sequences ON sequences(id, key, plan_id, state_status, state_start, state_end);`,
-	`CREATE INDEX If Not Exists idx_actions ON actions(id, key, plan_id, state_status, state_start, state_end, plugin);`,
+	PartitionKey string          `json:"partitionKey,omitempty"`
+	ID           uuid.UUID       `json:"id,omitempty"`
+	Key          uuid.UUID       `json:"key,omitempty"`
+	PlanID       uuid.UUID       `json:"planID,omitempty"`
+	Name         string          `json:"name,omitempty"`
+	Descr        string          `json:"descr,omitempty"`
+	Pos          int             `json:"pos,omitempty"`
+	Plugin       string          `json:"plugin,omitempty"`
+	Timeout      time.Duration   `json:"timeout,omitempty"`
+	Retries      int             `json:"retries,omitempty"`
+	Req          []byte          `json:"req,omitempty"`
+	Attempts     []byte          `json:"attempts,omitempty"`
+	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
+	StateStart   time.Time       `json:"stateStart,omitempty"`
+	StateEnd     time.Time       `json:"stateEnd,omitempty"`
 }

@@ -47,17 +47,19 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 		return nil, err
 	}
 
-	s := &workflow.Sequence{}
-	s.ID = resp.ID
+	s := &workflow.Sequence{
+		ID:    resp.ID,
+		Name:  resp.Name,
+		Descr: resp.Descr,
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+		},
+	}
 	k := resp.Key
 	if k != uuid.Nil {
 		s.Key = k
-	}
-	s.Name = resp.Name
-	s.Descr = resp.Descr
-	s.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get sequence state: %w", err)
 	}
 	s.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {

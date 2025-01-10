@@ -29,9 +29,9 @@ func (c checksUpdater) UpdateChecks(ctx context.Context, check *workflow.Checks)
 	defer c.mu.Unlock()
 
 	patch := azcosmos.PatchOperations{}
-	patch.AppendReplace("/stateStatus", int64(check.State.Status))
-	patch.AppendReplace("/stateStart", check.State.Start.UnixNano())
-	patch.AppendReplace("/stateEnd", check.State.End.UnixNano())
+	patch.AppendReplace("/stateStatus", check.State.Status)
+	patch.AppendReplace("/stateStart", check.State.Start)
+	patch.AppendReplace("/stateEnd", check.State.End)
 
 	// var ifMatchEtag *azcore.ETag = nil
 	// if etag, ok := h.GetEtag(item); ok {

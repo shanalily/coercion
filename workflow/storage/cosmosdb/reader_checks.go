@@ -50,16 +50,18 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 		return nil, fmt.Errorf("failed to unmarshal check: %w", err)
 	}
 
-	c := &workflow.Checks{}
-	c.ID = resp.ID
+	c := &workflow.Checks{
+		ID:    resp.ID,
+		Delay: time.Duration(resp.Delay),
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+		},
+	}
 	k := resp.Key
 	if k != uuid.Nil {
 		c.Key = k
-	}
-	c.Delay = time.Duration(resp.Delay)
-	c.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
-	if err != nil {
-		return nil, fmt.Errorf("checksRowToChecks: %w", err)
 	}
 	c.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {

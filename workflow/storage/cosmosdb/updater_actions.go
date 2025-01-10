@@ -29,9 +29,9 @@ func (a actionUpdater) UpdateAction(ctx context.Context, action *workflow.Action
 	defer a.mu.Unlock()
 
 	patch := azcosmos.PatchOperations{}
-	patch.AppendReplace("/stateStatus", int64(action.State.Status))
-	patch.AppendReplace("/stateStart", action.State.Start.UnixNano())
-	patch.AppendReplace("/stateEnd", action.State.End.UnixNano())
+	patch.AppendReplace("/stateStatus", action.State.Status)
+	patch.AppendReplace("/stateStart", action.State.Start)
+	patch.AppendReplace("/stateEnd", action.State.End)
 
 	// var ifMatchEtag *azcore.ETag = nil
 	// if etag, ok := h.GetEtag(item); ok {

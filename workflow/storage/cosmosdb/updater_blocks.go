@@ -28,9 +28,9 @@ func (b blockUpdater) UpdateBlock(ctx context.Context, block *workflow.Block) er
 	defer b.mu.Unlock()
 
 	patch := azcosmos.PatchOperations{}
-	patch.AppendReplace("/stateStatus", int64(block.State.Status))
-	patch.AppendReplace("/stateStart", block.State.Start.UnixNano())
-	patch.AppendReplace("/stateEnd", block.State.End.UnixNano())
+	patch.AppendReplace("/stateStatus", block.State.Status)
+	patch.AppendReplace("/stateStart", block.State.Start)
+	patch.AppendReplace("/stateEnd", block.State.End)
 
 	// var ifMatchEtag *azcore.ETag = nil
 	// if etag, ok := h.GetEtag(item); ok {

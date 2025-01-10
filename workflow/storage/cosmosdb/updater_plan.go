@@ -31,10 +31,10 @@ func (u planUpdater) UpdatePlan(ctx context.Context, p *workflow.Plan) error {
 	defer u.mu.Unlock()
 
 	patch := azcosmos.PatchOperations{}
-	patch.AppendReplace("/reason", int64(p.Reason))
-	patch.AppendReplace("/stateStatus", int64(p.State.Status))
-	patch.AppendReplace("/stateStart", p.State.Start.UnixNano())
-	patch.AppendReplace("/stateEnd", p.State.End.UnixNano())
+	patch.AppendReplace("/reason", p.Reason)
+	patch.AppendReplace("/stateStatus", p.State.Status)
+	patch.AppendReplace("/stateStart", p.State.Start)
+	patch.AppendReplace("/stateEnd", p.State.End)
 
 	// var ifMatchEtag *azcore.ETag = nil
 	// if etag, ok := h.GetEtag(item); ok {

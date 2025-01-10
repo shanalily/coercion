@@ -227,11 +227,11 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 	}
 	result.Name = resp.Name
 	result.Descr = resp.Descr
-	result.SubmitTime = time.Unix(0, resp.SubmitTime)
+	result.SubmitTime = resp.SubmitTime
 	result.State = &workflow.State{
 		Status: workflow.Status(resp.StateStatus),
-		Start:  time.Unix(0, resp.StateStart),
-		End:    time.Unix(0, resp.StateEnd),
+		Start:  resp.StateStart,
+		End:    resp.StateEnd,
 	}
 	return result, nil
 }
@@ -288,18 +288,10 @@ func timeFromInt64(unixTime int64) (time.Time, error) {
 
 // fieldToState pulls the stateStart, stateEnd and stateStatus from a stmt
 // and turns them into a *workflow.State.
-func fieldToState(stateStatus, stateStart, stateEnd int64) (*workflow.State, error) {
-	start, err := timeFromInt64(stateStart)
-	if err != nil {
-		return nil, err
-	}
-	end, err := timeFromInt64(stateEnd)
-	if err != nil {
-		return nil, err
-	}
+func fieldToState(stateStatus int64, stateStart, stateEnd time.Time) *workflow.State {
 	return &workflow.State{
 		Status: workflow.Status(stateStatus),
-		Start:  start,
-		End:    end,
-	}, nil
+		Start:  stateStart,
+		End:    stateEnd,
+	}
 }

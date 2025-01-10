@@ -88,20 +88,22 @@ func (r reader) actionRowToAction(ctx context.Context, response []byte) (*workfl
 		return nil, err
 	}
 
-	a := &workflow.Action{}
-	a.ID = resp.ID
+	a := &workflow.Action{
+		ID:      resp.ID,
+		Name:    resp.Name,
+		Descr:   resp.Descr,
+		Plugin:  resp.Plugin,
+		Timeout: time.Duration(resp.Timeout),
+		Retries: resp.Retries,
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+		},
+	}
 	k := resp.Key
 	if k != uuid.Nil {
 		a.Key = k
-	}
-	a.Name = resp.Name
-	a.Descr = resp.Descr
-	a.Plugin = resp.Plugin
-	a.Timeout = time.Duration(resp.Timeout)
-	a.Retries = int(resp.Retries)
-	a.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get action state: %w", err)
 	}
 	plug := r.reg.Plugin(a.Plugin)
 	if plug == nil {

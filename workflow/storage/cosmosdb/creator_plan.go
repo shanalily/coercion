@@ -68,10 +68,10 @@ func planToEntry(ctx context.Context, pk string, p *workflow.Plan) (plansEntry, 
 		Descr:        p.Descr,
 		Meta:         p.Meta,
 		Blocks:       blocks,
-		StateStatus:  int64(p.State.Status),
-		StateStart:   p.State.Start.UnixNano(),
-		StateEnd:     p.State.End.UnixNano(),
-		Reason:       int64(p.Reason),
+		StateStatus:  p.State.Status,
+		StateStart:   p.State.Start,
+		StateEnd:     p.State.End,
+		Reason:       p.Reason,
 	}
 
 	if p.BypassChecks != nil {
@@ -91,9 +91,9 @@ func planToEntry(ctx context.Context, pk string, p *workflow.Plan) (plansEntry, 
 	}
 
 	if p.SubmitTime.Before(zeroTime) {
-		plan.SubmitTime = zeroTime.UnixNano()
+		plan.SubmitTime = zeroTime
 	} else {
-		plan.SubmitTime = p.SubmitTime.UnixNano()
+		plan.SubmitTime = p.SubmitTime
 	}
 
 	return plan, nil
@@ -144,10 +144,10 @@ func checkToEntry(ctx context.Context, pk string, planID uuid.UUID, c *workflow.
 		Key:          c.Key,
 		PlanID:       planID,
 		Actions:      actions,
-		Delay:        int64(c.Delay),
-		StateStatus:  int64(c.State.Status),
-		StateStart:   c.State.Start.UnixNano(),
-		StateEnd:     c.State.End.UnixNano(),
+		Delay:        c.Delay,
+		StateStatus:  c.State.Status,
+		StateStart:   c.State.Start,
+		StateEnd:     c.State.End,
 	}, nil
 }
 
@@ -196,15 +196,15 @@ func blockToEntry(ctx context.Context, pk string, planID uuid.UUID, pos int, b *
 		PlanID:            planID,
 		Name:              b.Name,
 		Descr:             b.Descr,
-		Pos:               int64(pos),
-		EntranceDelay:     int64(b.EntranceDelay),
-		ExitDelay:         int64(b.ExitDelay),
+		Pos:               pos,
+		EntranceDelay:     b.EntranceDelay,
+		ExitDelay:         b.ExitDelay,
 		Sequences:         sequences,
-		Concurrency:       int64(b.Concurrency),
-		ToleratedFailures: int64(b.ToleratedFailures),
-		StateStatus:       int64(b.State.Status),
-		StateStart:        b.State.Start.UnixNano(),
-		StateEnd:          b.State.End.UnixNano(),
+		Concurrency:       b.Concurrency,
+		ToleratedFailures: b.ToleratedFailures,
+		StateStatus:       b.State.Status,
+		StateStart:        b.State.Start,
+		StateEnd:          b.State.End,
 	}
 
 	if b.BypassChecks != nil {
@@ -238,11 +238,11 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 		PlanID:       planID,
 		Name:         seq.Name,
 		Descr:        seq.Descr,
-		Pos:          int64(pos),
+		Pos:          pos,
 		Actions:      actions,
-		StateStatus:  int64(seq.State.Status),
-		StateStart:   seq.State.Start.UnixNano(),
-		StateEnd:     seq.State.End.UnixNano(),
+		StateStatus:  seq.State.Status,
+		StateStart:   seq.State.Start,
+		StateEnd:     seq.State.End,
 	}
 
 	for i, a := range seq.Actions {
@@ -282,15 +282,15 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 		PlanID:       planID,
 		Name:         a.Name,
 		Descr:        a.Descr,
-		Pos:          int64(pos),
+		Pos:          pos,
 		Plugin:       a.Plugin,
-		Timeout:      int64(a.Timeout),
-		Retries:      int64(a.Retries),
+		Timeout:      a.Timeout,
+		Retries:      a.Retries,
 		Req:          req,
 		Attempts:     attempts,
-		StateStatus:  int64(a.State.Status),
-		StateStart:   a.State.Start.UnixNano(),
-		StateEnd:     a.State.End.UnixNano(),
+		StateStatus:  a.State.Status,
+		StateStart:   a.State.Start,
+		StateEnd:     a.State.End,
 	}
 
 	itemOpt := &azcosmos.ItemOptions{

@@ -3,7 +3,6 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/workflow"
@@ -43,7 +42,6 @@ func (p reader) fetchBlockByID(ctx context.Context, id uuid.UUID) (*workflow.Blo
 
 // blockRowToBlock converts a cosmosdb row to a workflow.Block.
 func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResponse) (*workflow.Block, error) {
-	b := &workflow.Block{}
 
 	var err error
 	var resp blocksEntry
@@ -52,21 +50,24 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 		return nil, err
 	}
 
-	b.ID = resp.ID
+	b := &workflow.Block{
+		ID:            resp.ID,
+		Name:          resp.Name,
+		Descr:         resp.Descr,
+		EntranceDelay: resp.EntranceDelay,
+		ExitDelay:     resp.ExitDelay,
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+		},
+		Concurrency:       resp.Concurrency,
+		ToleratedFailures: resp.ToleratedFailures,
+	}
 	k := resp.Key
 	if k != uuid.Nil {
 		b.Key = k
 	}
-	b.Name = resp.Name
-	b.Descr = resp.Descr
-	b.EntranceDelay = time.Duration(resp.EntranceDelay)
-	b.ExitDelay = time.Duration(resp.ExitDelay)
-	b.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
-	if err != nil {
-		return nil, fmt.Errorf("blockRowToBlock: %w", err)
-	}
-	b.Concurrency = int(resp.Concurrency)
-	b.ToleratedFailures = int(resp.ToleratedFailures)
 	b.BypassChecks, err = p.idToCheck(ctx, resp.BypassChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get block bypasschecks: %w", err)

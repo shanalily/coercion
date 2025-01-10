@@ -254,19 +254,19 @@ func main() {
 		}
 	}
 
-	actionID, _ := uuid.Parse("01944c90-7b34-78ae-8734-3cf2b7e828a6")
-	actionIDs := []uuid.UUID{
-		// planID,
-		actionID,
-	}
-	actions, err := vault.IDsToActions(ctx, actionIDs)
-	if err != nil {
-		fatalErr(logger, "Failed to list actions: %v", err)
-	}
-	for _, a := range actions {
-		fmt.Println(a)
-		fmt.Println(a.Attempts[0].Err)
-	}
+	// actionID, _ := uuid.Parse("01944c90-7b34-78ae-8734-3cf2b7e828a6")
+	// actionIDs := []uuid.UUID{
+	// 	// planID,
+	// 	actionID,
+	// }
+	// actions, err := vault.IDsToActions(ctx, actionIDs)
+	// if err != nil {
+	// 	fatalErr(logger, "Failed to list actions: %v", err)
+	// }
+	// for _, a := range actions {
+	// 	fmt.Println(a)
+	// 	fmt.Println(a.Attempts[0].Err)
+	// }
 
 	result, err := vault.Read(ctx, planID)
 	if err != nil {

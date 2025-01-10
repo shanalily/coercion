@@ -31,25 +31,23 @@ func (p reader) convertToPlan(ctx context.Context, response *azcosmos.ItemRespon
 		return nil, err
 	}
 
-	plan := &workflow.Plan{}
-	plan.ID = resp.ID
+	plan := &workflow.Plan{
+		ID:         resp.ID,
+		Name:       resp.Name,
+		Descr:      resp.Descr,
+		SubmitTime: resp.SubmitTime,
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+		},
+	}
 	gid := resp.GroupID
 	if gid == uuid.Nil {
 		plan.GroupID = uuid.Nil
 	} else {
 		plan.GroupID = resp.GroupID
 	}
-	plan.Name = resp.Name
-	plan.Descr = resp.Descr
-	plan.SubmitTime, err = timeFromInt64(resp.SubmitTime)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get plan submit time: %w", err)
-	}
-	plan.State, err = fieldToState(resp.StateStatus, resp.StateStart, resp.StateEnd)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get plan state: %w", err)
-	}
-
 	plan.BypassChecks, err = p.idToCheck(ctx, resp.BypassChecks)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get plan bypasschecks: %w", err)

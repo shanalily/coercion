@@ -8,7 +8,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
 	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	// "github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 type deleter struct {
@@ -29,145 +29,119 @@ func (d deleter) Delete(ctx context.Context, id uuid.UUID) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// conn, err := d.pool.Take(ctx)
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't get a connection from the pool: %w", err)
+	// var ifMatchEtag *azcore.ETag = nil
+	// if etag, ok := h.GetEtag(item); ok {
+	//   ifMatchEtag = (*azcore.ETag)(&etag)
 	// }
-	// defer d.pool.Put(conn)
+	itemOpt := &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+		// IfMatchEtag:                  ifMatchEtag,
+	}
 
-	// defer cosmosdbx.Transaction(conn)(&err)
-
-	if err = d.deletePlan(ctx, plan); err != nil {
+	if err = d.deletePlan(ctx, plan, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete plan: %w", err)
 	}
 	return nil
 }
 
-func (d deleter) deletePlan(ctx context.Context, plan *workflow.Plan) error {
-	if err := d.deleteChecks(ctx, plan.PreChecks); err != nil {
+func (d deleter) deletePlan(ctx context.Context, plan *workflow.Plan, itemOpt *azcosmos.ItemOptions) error {
+	if err := d.deleteChecks(ctx, plan.PreChecks, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete plan prechecks: %w", err)
 	}
-	if err := d.deleteChecks(ctx, plan.PostChecks); err != nil {
+	if err := d.deleteChecks(ctx, plan.PostChecks, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete plan postchecks: %w", err)
 	}
-	if err := d.deleteChecks(ctx, plan.ContChecks); err != nil {
+	if err := d.deleteChecks(ctx, plan.ContChecks, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete plan contchecks: %w", err)
 	}
-	if err := d.deleteBlocks(ctx, plan.Blocks); err != nil {
+	if err := d.deleteChecks(ctx, plan.DeferredChecks, itemOpt); err != nil {
+		return fmt.Errorf("couldn't delete plan deferredchecks: %w", err)
+	}
+	if err := d.deleteBlocks(ctx, plan.Blocks, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete blocks: %w", err)
 	}
 
-	// stmt, err := conn.Prepare(deletePlanByID)
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
-	// }
+	if _, err := d.cc.GetPlansClient().DeleteItem(ctx, d.cc.GetPK(), plan.ID.String(), itemOpt); err != nil {
+		return fmt.Errorf("failed to delete plan through Cosmos DB API: %w", err)
+	}
 
-	// stmt.SetText("$id", plan.ID.String())
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("problem deleting plan: %w", err)
-	// }
 	return nil
 }
 
-func (d deleter) deleteBlocks(ctx context.Context, blocks []*workflow.Block) error {
+func (d deleter) deleteBlocks(ctx context.Context, blocks []*workflow.Block, itemOpt *azcosmos.ItemOptions) error {
 	if len(blocks) == 0 {
 		return nil
 	}
 
 	for _, block := range blocks {
-		if err := d.deleteChecks(ctx, block.PreChecks); err != nil {
+		if err := d.deleteChecks(ctx, block.PreChecks, itemOpt); err != nil {
 			return fmt.Errorf("couldn't delete block prechecks: %w", err)
 		}
-		if err := d.deleteChecks(ctx, block.PostChecks); err != nil {
+		if err := d.deleteChecks(ctx, block.PostChecks, itemOpt); err != nil {
 			return fmt.Errorf("couldn't delete block postchecks: %w", err)
 		}
-		if err := d.deleteChecks(ctx, block.ContChecks); err != nil {
+		if err := d.deleteChecks(ctx, block.ContChecks, itemOpt); err != nil {
 			return fmt.Errorf("couldn't delete block contchecks: %w", err)
 		}
-		if err := d.deletesSeqs(ctx, block.Sequences); err != nil {
+		if err := d.deleteChecks(ctx, block.DeferredChecks, itemOpt); err != nil {
+			return fmt.Errorf("couldn't delete block deferredchecks: %w", err)
+		}
+		if err := d.deletesSeqs(ctx, block.Sequences, itemOpt); err != nil {
 			return fmt.Errorf("couldn't delete block sequences: %w", err)
 		}
 	}
 
-	// for _, block := range blocks {
-	for _, _ = range blocks {
-		// stmt, err := conn.Prepare(delteBlocksByID)
-		// if err != nil {
-		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
-		// }
-		// stmt.SetText("$id", block.ID.String())
-		// _, err = stmt.Step()
-		// if err != nil {
-		// 	return fmt.Errorf("problem deleting block: %w", err)
-		// }
+	for _, block := range blocks {
+		if _, err := d.cc.GetBlocksClient().DeleteItem(ctx, d.cc.GetPK(), block.ID.String(), itemOpt); err != nil {
+			return fmt.Errorf("failed to delete block through Cosmos DB API: %w", err)
+		}
 	}
 	return nil
 }
 
-func (d deleter) deleteChecks(ctx context.Context, checks *workflow.Checks) error {
+func (d deleter) deleteChecks(ctx context.Context, checks *workflow.Checks, itemOpt *azcosmos.ItemOptions) error {
 	if checks == nil {
 		return nil
 	}
 
-	if err := d.deleteActions(ctx, checks.Actions); err != nil {
+	if err := d.deleteActions(ctx, checks.Actions, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete checks actions: %w", err)
 	}
 
-	// stmt, err := conn.Prepare(deleteChecksByID)
-	// if err != nil {
-	// 	return fmt.Errorf("couldn't prepare checks delete statement: %w", err)
-	// }
-	// stmt.SetText("$id", checks.ID.String())
-	// _, err = stmt.Step()
-	// if err != nil {
-	// 	return fmt.Errorf("problem deleting check: %w", err)
-	// }
+	if _, err := d.cc.GetChecksClient().DeleteItem(ctx, d.cc.GetPK(), checks.ID.String(), itemOpt); err != nil {
+		return fmt.Errorf("failed to delete checks through Cosmos DB API: %w", err)
+	}
 	return nil
 }
 
-func (d deleter) deletesSeqs(ctx context.Context, seqs []*workflow.Sequence) error {
+func (d deleter) deletesSeqs(ctx context.Context, seqs []*workflow.Sequence, itemOpt *azcosmos.ItemOptions) error {
 	if len(seqs) == 0 {
 		return nil
 	}
 
 	for _, seq := range seqs {
-		if err := d.deleteActions(ctx, seq.Actions); err != nil {
+		if err := d.deleteActions(ctx, seq.Actions, itemOpt); err != nil {
 			return fmt.Errorf("couldn't delete sequence actions: %w", err)
 		}
 	}
 
-	// for _, seq := range seqs {
-	for _, _ = range seqs {
-		// stmt, err := conn.Prepare(deleteSequencesByID)
-		// if err != nil {
-		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
-		// }
-		// stmt.SetText("$id", seq.ID.String())
-		// _, err = stmt.Step()
-		// if err != nil {
-		// 	return fmt.Errorf("problem deleting sequence: %w", err)
-		// }
+	for _, seq := range seqs {
+		if _, err := d.cc.GetSequencesClient().DeleteItem(ctx, d.cc.GetPK(), seq.ID.String(), itemOpt); err != nil {
+			return fmt.Errorf("failed to delete sequence through Cosmos DB API: %w", err)
+		}
 	}
 	return nil
 }
 
-func (d deleter) deleteActions(ctx context.Context, actions []*workflow.Action) error {
+func (d deleter) deleteActions(ctx context.Context, actions []*workflow.Action, itemOpt *azcosmos.ItemOptions) error {
 	if len(actions) == 0 {
 		return nil
 	}
 
-	// for _, action := range actions {
-	for _, _ = range actions {
-		// stmt, err := conn.Prepare(deleteActionsByID)
-		// if err != nil {
-		// 	return fmt.Errorf("couldn't prepare delete statement: %w", err)
-		// }
-		// stmt.SetText("$id", action.ID.String())
-		// _, err = stmt.Step()
-		// if err != nil {
-		// 	return fmt.Errorf("problem deleting action: %w", err)
-		// }
+	for _, action := range actions {
+		if _, err := d.cc.GetActionsClient().DeleteItem(ctx, d.cc.GetPK(), action.ID.String(), itemOpt); err != nil {
+			return fmt.Errorf("failed to delete action through Cosmos DB API: %w", err)
+		}
 	}
 	return nil
 }

@@ -38,7 +38,7 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &resErr) && resErr.StatusCode == http.StatusNotFound
 }
 
-// IsNotFound checks if the error indicates there is a resource conflict.
+// IsConflict checks if the error indicates there is a resource conflict.
 // Useful to check if a resource already exists in testing.
 func IsConflict(err error) bool {
 	var resErr *azcore.ResponseError
@@ -75,15 +75,14 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 	q, parameters := r.buildSearchQuery(filters)
 
 	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: parameters})
-	resultsStream := make(chan storage.Stream[storage.ListResult])
-	results := make([]storage.ListResult, 0)
+	results := make(chan storage.Stream[storage.ListResult])
 	go func() {
-		defer close(resultsStream)
+		defer close(results)
 		// need to check for ctx timeout
 		for pager.More() {
 			res, err := pager.NextPage(ctx)
 			if err != nil {
-				resultsStream <- storage.Stream[storage.ListResult]{
+				results <- storage.Stream[storage.ListResult]{
 					Err: fmt.Errorf("problem listing plans: %w", err),
 				}
 				return
@@ -91,22 +90,17 @@ func (r reader) Search(ctx context.Context, filters storage.Filters) (chan stora
 			for _, item := range res.Items {
 				result, err := r.listResultsFunc(item)
 				if err != nil {
-					resultsStream <- storage.Stream[storage.ListResult]{
+					results <- storage.Stream[storage.ListResult]{
 						Err: fmt.Errorf("problem listing items in plans: %w", err),
 					}
 					return
 				}
-				results = append(results, result)
+				results <- storage.Stream[storage.ListResult]{Result: result}
 			}
-		}
-
-		// resultsStream a= make(chan storage.Stream[storage.ListResult], len(results))
-		for _, r := range results {
-			resultsStream <- storage.Stream[storage.ListResult]{Result: r}
 		}
 		return
 	}()
-	return resultsStream, nil
+	return results, nil
 }
 
 func (r reader) buildSearchQuery(filters storage.Filters) (string, []azcosmos.QueryParameter) {
@@ -174,14 +168,13 @@ func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storag
 	}
 
 	pager := r.cc.GetPlansClient().NewQueryItemsPager(q, r.cc.GetPK(), &azcosmos.QueryOptions{QueryParameters: []azcosmos.QueryParameter{}})
-	resultsStream := make(chan storage.Stream[storage.ListResult])
-	results := make([]storage.ListResult, 0)
+	results := make(chan storage.Stream[storage.ListResult])
 	go func() {
-		defer close(resultsStream)
+		defer close(results)
 		for pager.More() {
 			res, err := pager.NextPage(ctx)
 			if err != nil {
-				resultsStream <- storage.Stream[storage.ListResult]{
+				results <- storage.Stream[storage.ListResult]{
 					Err: fmt.Errorf("problem listing plans: %w", err),
 				}
 				return
@@ -189,20 +182,16 @@ func (r reader) List(ctx context.Context, limit int) (chan storage.Stream[storag
 			for _, item := range res.Items {
 				result, err := r.listResultsFunc(item)
 				if err != nil {
-					resultsStream <- storage.Stream[storage.ListResult]{
+					results <- storage.Stream[storage.ListResult]{
 						Err: fmt.Errorf("problem listing items in plans: %w", err),
 					}
 					return
 				}
-				results = append(results, result)
+				results <- storage.Stream[storage.ListResult]{Result: result}
 			}
 		}
-
-		for _, r := range results {
-			resultsStream <- storage.Stream[storage.ListResult]{Result: r}
-		}
 	}()
-	return resultsStream, nil
+	return results, nil
 }
 
 // listResultsFunc is a helper function to convert a SQLite statement into a ListResult.
@@ -215,21 +204,18 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 		return storage.ListResult{}, err
 	}
 
-	result := storage.ListResult{}
-	result.ID = resp.ID
-	gid := resp.GroupID
-	if gid == uuid.Nil {
-		result.GroupID = uuid.Nil
-	} else {
-		result.GroupID = resp.GroupID
-	}
-	result.Name = resp.Name
-	result.Descr = resp.Descr
-	result.SubmitTime = resp.SubmitTime
-	result.State = &workflow.State{
-		Status: workflow.Status(resp.StateStatus),
-		Start:  resp.StateStart,
-		End:    resp.StateEnd,
+	result := storage.ListResult{
+		ID:         resp.ID,
+		GroupID:    resp.GroupID,
+		Name:       resp.Name,
+		Descr:      resp.Descr,
+		SubmitTime: resp.SubmitTime,
+		State: &workflow.State{
+			Status: resp.StateStatus,
+			Start:  resp.StateStart,
+			End:    resp.StateEnd,
+			ETag:   resp.ETag,
+		},
 	}
 	return result, nil
 }

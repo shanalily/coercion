@@ -13,7 +13,7 @@ import (
 	// "github.com/element-of-surprise/coercion/plugins/registry"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/builder"
-	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb/testing/plugins"
+	"github.com/element-of-surprise/coercion/workflow/storage/sqlite/testing/plugins"
 	"github.com/element-of-surprise/coercion/workflow/utils/clone"
 	"github.com/element-of-surprise/coercion/workflow/utils/walk"
 

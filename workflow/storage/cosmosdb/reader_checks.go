@@ -52,6 +52,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 
 	c := &workflow.Checks{
 		ID:    resp.ID,
+		Key:   resp.Key,
 		Delay: time.Duration(resp.Delay),
 		State: &workflow.State{
 			Status: resp.StateStatus,
@@ -59,10 +60,6 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 			End:    resp.StateEnd,
 			ETag:   resp.ETag,
 		},
-	}
-	k := resp.Key
-	if k != uuid.Nil {
-		c.Key = k
 	}
 	c.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {

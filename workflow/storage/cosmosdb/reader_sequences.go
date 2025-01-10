@@ -49,6 +49,7 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 
 	s := &workflow.Sequence{
 		ID:    resp.ID,
+		Key:   resp.Key,
 		Name:  resp.Name,
 		Descr: resp.Descr,
 		State: &workflow.State{
@@ -57,10 +58,6 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 			End:    resp.StateEnd,
 			ETag:   resp.ETag,
 		},
-	}
-	k := resp.Key
-	if k != uuid.Nil {
-		s.Key = k
 	}
 	s.Actions, err = p.idsToActions(ctx, resp.Actions)
 	if err != nil {

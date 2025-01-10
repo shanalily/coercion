@@ -52,6 +52,7 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 
 	b := &workflow.Block{
 		ID:            resp.ID,
+		Key:           resp.Key,
 		Name:          resp.Name,
 		Descr:         resp.Descr,
 		EntranceDelay: resp.EntranceDelay,
@@ -64,10 +65,6 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 		},
 		Concurrency:       resp.Concurrency,
 		ToleratedFailures: resp.ToleratedFailures,
-	}
-	k := resp.Key
-	if k != uuid.Nil {
-		b.Key = k
 	}
 	b.BypassChecks, err = p.idToCheck(ctx, resp.BypassChecks)
 	if err != nil {

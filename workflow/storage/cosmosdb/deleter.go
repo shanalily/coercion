@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/google/uuid"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 type deleter struct {
 	mu *sync.Mutex
 	cc Client
-	// pool *cosmosdbx.Pool
 
 	reader reader
 }
@@ -60,6 +59,15 @@ func (d deleter) deletePlan(ctx context.Context, plan *workflow.Plan, itemOpt *a
 	if err := d.deleteBlocks(ctx, plan.Blocks, itemOpt); err != nil {
 		return fmt.Errorf("couldn't delete blocks: %w", err)
 	}
+
+	// Do I care about etag here? I don't have it for the other items unless I read.
+	// Once we're at the point where a plan needs to be deleted, I assume it's completed (whether failed or successful)
+	// and no important operations will take place on this other than to delete.
+	var ifMatchEtag *azcore.ETag = nil
+	if plan.State.ETag != "" {
+		ifMatchEtag = (*azcore.ETag)(&plan.State.ETag)
+	}
+	itemOpt.IfMatchEtag = ifMatchEtag
 
 	if _, err := d.cc.GetPlansClient().DeleteItem(ctx, d.cc.GetPK(), plan.ID.String(), itemOpt); err != nil {
 		return fmt.Errorf("failed to delete plan through Cosmos DB API: %w", err)

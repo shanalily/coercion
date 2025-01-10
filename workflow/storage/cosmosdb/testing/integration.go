@@ -17,7 +17,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow/builder"
 	"github.com/element-of-surprise/coercion/workflow/storage"
 	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb"
-	"github.com/element-of-surprise/coercion/workflow/storage/cosmosdb/testing/plugins"
+	"github.com/element-of-surprise/coercion/workflow/storage/sqlite/testing/plugins"
 	"github.com/element-of-surprise/coercion/workflow/utils/clone"
 	"github.com/element-of-surprise/coercion/workflow/utils/walk"
 	"github.com/google/uuid"

@@ -91,6 +91,7 @@ func (r reader) actionRowToAction(ctx context.Context, response []byte) (*workfl
 
 	a := &workflow.Action{
 		ID:      resp.ID,
+		Key:     resp.Key,
 		Name:    resp.Name,
 		Descr:   resp.Descr,
 		Plugin:  resp.Plugin,
@@ -103,10 +104,7 @@ func (r reader) actionRowToAction(ctx context.Context, response []byte) (*workfl
 			ETag:   resp.ETag,
 		},
 	}
-	k := resp.Key
-	if k != uuid.Nil {
-		a.Key = k
-	}
+
 	plug := r.reg.Plugin(a.Plugin)
 	if plug == nil {
 		return nil, fmt.Errorf("couldn't find plugin %s", a.Plugin)

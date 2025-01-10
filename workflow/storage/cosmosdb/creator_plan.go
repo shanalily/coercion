@@ -13,7 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
-var zeroTime = time.Unix(0, 0)
+var (
+	zeroTime = time.Unix(0, 0)
+
+	createOpt = defaultOpt
+)
+
+func defaultOpt() *azcosmos.ItemOptions {
+	return &azcosmos.ItemOptions{
+		EnableContentResponseOnWrite: true,
+	}
+}
 
 // commitPlan commits a plan to the database. This commits the entire plan and all sub-objects.
 func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
@@ -35,15 +45,12 @@ func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 	}
 
 	// save the JSON format document into Cosmos DB.
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
 	itemJson, err := json.Marshal(plan)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	if _, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+	if _, err := u.cc.GetPlansClient().CreateItem(ctx, u.cc.GetPK(), itemJson, createOpt()); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 
@@ -114,15 +121,12 @@ func (u creator) commitChecks(ctx context.Context, planID uuid.UUID, c *workflow
 			return fmt.Errorf("commitAction: %w", err)
 		}
 	}
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
 	itemJson, err := json.Marshal(checks)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	if _, err := u.cc.GetChecksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+	if _, err := u.cc.GetChecksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, createOpt()); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 
@@ -168,15 +172,12 @@ func (u creator) commitBlock(ctx context.Context, planID uuid.UUID, pos int, b *
 			return fmt.Errorf("(commitSequence: %w", err)
 		}
 	}
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
 	itemJson, err := json.Marshal(block)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	if _, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+	if _, err := u.cc.GetBlocksClient().CreateItem(ctx, u.cc.GetPK(), itemJson, createOpt()); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 
@@ -236,15 +237,12 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 			return fmt.Errorf("planToEntry(commitAction): %w", err)
 		}
 	}
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
 	itemJson, err := json.Marshal(sequence)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	if _, err := u.cc.GetSequencesClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+	if _, err := u.cc.GetSequencesClient().CreateItem(ctx, u.cc.GetPK(), itemJson, createOpt()); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 
@@ -278,15 +276,12 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 		return err
 	}
 
-	itemOpt := &azcosmos.ItemOptions{
-		EnableContentResponseOnWrite: true,
-	}
 	itemJson, err := json.Marshal(action)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	if _, err := u.cc.GetActionsClient().CreateItem(ctx, u.cc.GetPK(), itemJson, itemOpt); err != nil {
+	if _, err := u.cc.GetActionsClient().CreateItem(ctx, u.cc.GetPK(), itemJson, createOpt()); err != nil {
 		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
 	}
 

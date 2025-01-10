@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
@@ -32,20 +33,19 @@ func (b blockUpdater) UpdateBlock(ctx context.Context, block *workflow.Block) er
 	patch.AppendReplace("/stateStart", block.State.Start)
 	patch.AppendReplace("/stateEnd", block.State.End)
 
-	// var ifMatchEtag *azcore.ETag = nil
-	// if etag, ok := h.GetEtag(item); ok {
-	// 	ifMatchEtag = (*azcore.ETag)(&etag)
-	// }
+	var ifMatchEtag *azcore.ETag = nil
+	if block.State.ETag != "" {
+		ifMatchEtag = (*azcore.ETag)(&block.State.ETag)
+	}
 	itemOpt := &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
-		// IfMatchEtag:                  ifMatchEtag,
+		IfMatchEtag:                  ifMatchEtag,
 	}
 
 	// save the item into Cosmos DB
 	res, err := b.cc.PatchItem(ctx, b.pk, block.ID.String(), patch, itemOpt)
 	if err != nil {
-		// return fmt.Errorf("failed to update item through Cosmos DB API: %w", cosmosErr(err))
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+		return fmt.Errorf("failed to patch item through Cosmos DB API: %w", err)
 	}
 	fmt.Println(res.ETag)
 

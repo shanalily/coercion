@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// type BypassChecks uuid.UUID
-
 type plansEntry struct {
 	PartitionKey   string                 `json:"partitionKey,omitempty"`
 	ID             uuid.UUID              `json:"id,omitempty"`
@@ -27,6 +25,8 @@ type plansEntry struct {
 	StateEnd       time.Time              `json:"stateEnd,omitempty"`
 	SubmitTime     time.Time              `json:"submitTime,omitempty"`
 	Reason         workflow.FailureReason `json:"reason,omitempty"`
+
+	ETag string `json:"_etag,omitempty"`
 }
 
 type blocksEntry struct {
@@ -50,6 +50,8 @@ type blocksEntry struct {
 	StateStatus       workflow.Status `json:"stateStatus,omitempty"`
 	StateStart        time.Time       `json:"stateStart,omitempty"`
 	StateEnd          time.Time       `json:"stateEnd,omitempty"`
+
+	ETag string `json:"_etag,omitempty"`
 }
 
 type checksEntry struct {
@@ -62,6 +64,8 @@ type checksEntry struct {
 	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
 	StateStart   time.Time       `json:"stateStart,omitempty"`
 	StateEnd     time.Time       `json:"stateEnd,omitempty"`
+
+	ETag string `json:"_etag,omitempty"`
 }
 
 type sequencesEntry struct {
@@ -76,6 +80,8 @@ type sequencesEntry struct {
 	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
 	StateStart   time.Time       `json:"stateStart,omitempty"`
 	StateEnd     time.Time       `json:"stateEnd,omitempty"`
+
+	ETag string `json:"_etag,omitempty"`
 }
 
 type actionsEntry struct {
@@ -94,4 +100,6 @@ type actionsEntry struct {
 	StateStatus  workflow.Status `json:"stateStatus,omitempty"`
 	StateStart   time.Time       `json:"stateStart,omitempty"`
 	StateEnd     time.Time       `json:"stateEnd,omitempty"`
+
+	ETag string `json:"_etag,omitempty"`
 }

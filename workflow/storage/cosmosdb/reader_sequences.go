@@ -55,6 +55,7 @@ func (p reader) sequenceRowToSequence(ctx context.Context, response *azcosmos.It
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,
 			End:    resp.StateEnd,
+			ETag:   resp.ETag,
 		},
 	}
 	k := resp.Key

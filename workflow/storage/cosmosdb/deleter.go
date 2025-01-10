@@ -91,6 +91,7 @@ func (d deleter) deleteBlocks(ctx context.Context, blocks []*workflow.Block, ite
 		}
 	}
 
+	// should skip not found errors if part of the plan was deleted previously and this is being retried?
 	for _, block := range blocks {
 		if _, err := d.cc.GetBlocksClient().DeleteItem(ctx, d.cc.GetPK(), block.ID.String(), itemOpt); err != nil {
 			return fmt.Errorf("failed to delete block through Cosmos DB API: %w", err)

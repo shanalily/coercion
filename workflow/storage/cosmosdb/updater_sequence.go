@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.SequenceUpdater = sequenceUpdater{}
@@ -33,20 +33,19 @@ func (s sequenceUpdater) UpdateSequence(ctx context.Context, seq *workflow.Seque
 	patch.AppendReplace("/stateStart", seq.State.Start)
 	patch.AppendReplace("/stateEnd", seq.State.End)
 
-	// var ifMatchEtag *azcore.ETag = nil
-	// if etag, ok := h.GetEtag(item); ok {
-	// 	ifMatchEtag = (*azcore.ETag)(&etag)
-	// }
+	var ifMatchEtag *azcore.ETag = nil
+	if seq.State.ETag != "" {
+		ifMatchEtag = (*azcore.ETag)(&seq.State.ETag)
+	}
 	itemOpt := &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
-		// IfMatchEtag:                  ifMatchEtag,
+		IfMatchEtag:                  ifMatchEtag,
 	}
 
 	// save the item into Cosmos DB
 	res, err := s.cc.PatchItem(ctx, s.pk, seq.ID.String(), patch, itemOpt)
 	if err != nil {
-		// return fmt.Errorf("failed to update item through Cosmos DB API: %w", cosmosErr(err))
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+		return fmt.Errorf("failed to patch item through Cosmos DB API: %w", err)
 	}
 	fmt.Println(res.ETag)
 

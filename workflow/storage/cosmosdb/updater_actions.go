@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.ActionUpdater = actionUpdater{}
@@ -33,20 +33,19 @@ func (a actionUpdater) UpdateAction(ctx context.Context, action *workflow.Action
 	patch.AppendReplace("/stateStart", action.State.Start)
 	patch.AppendReplace("/stateEnd", action.State.End)
 
-	// var ifMatchEtag *azcore.ETag = nil
-	// if etag, ok := h.GetEtag(item); ok {
-	// 	ifMatchEtag = (*azcore.ETag)(&etag)
-	// }
+	var ifMatchEtag *azcore.ETag = nil
+	if action.State.ETag != "" {
+		ifMatchEtag = (*azcore.ETag)(&action.State.ETag)
+	}
 	itemOpt := &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
-		// IfMatchEtag:                  ifMatchEtag,
+		IfMatchEtag:                  ifMatchEtag,
 	}
 
 	// save the item into Cosmos DB
 	res, err := a.cc.PatchItem(ctx, a.pk, action.ID.String(), patch, itemOpt)
 	if err != nil {
-		// return fmt.Errorf("failed to update item through Cosmos DB API: %w", cosmosErr(err))
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+		return fmt.Errorf("failed to patch item through Cosmos DB API: %w", err)
 	}
 	fmt.Println(res.ETag)
 

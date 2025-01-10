@@ -20,10 +20,10 @@ func (p reader) fetchPlan(ctx context.Context, id uuid.UUID) (*workflow.Plan, er
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch plan: %w", err)
 	}
-	return p.convertToPlan(ctx, &res)
+	return p.planEntryToPlan(ctx, &res)
 }
 
-func (p reader) convertToPlan(ctx context.Context, response *azcosmos.ItemResponse) (*workflow.Plan, error) {
+func (p reader) planEntryToPlan(ctx context.Context, response *azcosmos.ItemResponse) (*workflow.Plan, error) {
 	var err error
 	var resp plansEntry
 	err = json.Unmarshal(response.Value, &resp)
@@ -40,6 +40,7 @@ func (p reader) convertToPlan(ctx context.Context, response *azcosmos.ItemRespon
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,
 			End:    resp.StateEnd,
+			ETag:   resp.ETag,
 		},
 	}
 	gid := resp.GroupID

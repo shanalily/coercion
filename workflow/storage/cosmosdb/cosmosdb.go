@@ -356,10 +356,10 @@ func createContainer(ctx context.Context, database *azcosmos.DatabaseClient, cna
 }
 
 func recreateContainer(ctx context.Context, client *azcosmos.Client, dbName, dbEndpoint, cname string, indexPaths []azcosmos.IncludedPath) (string, error) {
+	// check if container exists
 	found := true
 	cc, err := client.NewContainer(dbName, cname)
-	if err != nil { //&& !IsNotFound(err) {
-		// if !strings.Contains(err.Error(), "Resource Not Found") {
+	if err != nil {
 		return "", fmt.Errorf(
 			"failed to connect to Cosmos DB container: endpoint=%q, container=%q. %w",
 			dbEndpoint,
@@ -393,7 +393,6 @@ func recreateContainer(ctx context.Context, client *azcosmos.Client, dbName, dbE
 	activityID, err := createContainer(ctx, dc, cname, indexPaths)
 	if err != nil && !IsConflict(err) {
 		return "", fmt.Errorf("failed to create Cosmos DB container: container=%s. %w", cname, err)
-		// slog.Default().Warn(fmt.Sprintf("Container %s already exists: %s", c.name, err))
 	}
 
 	return activityID, nil

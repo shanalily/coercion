@@ -26,7 +26,8 @@ SELECT
 	a.attempts,
 	a.stateStatus,
 	a.stateStart,
-	a.stateEnd
+	a.stateEnd,
+	a._etag
 FROM actions a
 WHERE ARRAY_CONTAINS(@ids, a.id)
 ORDER BY a.pos ASC`
@@ -99,6 +100,7 @@ func (r reader) actionRowToAction(ctx context.Context, response []byte) (*workfl
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,
 			End:    resp.StateEnd,
+			ETag:   resp.ETag,
 		},
 	}
 	k := resp.Key

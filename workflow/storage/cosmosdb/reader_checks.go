@@ -57,6 +57,7 @@ func (p reader) checksRowToChecks(ctx context.Context, response *azcosmos.ItemRe
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,
 			End:    resp.StateEnd,
+			ETag:   resp.ETag,
 		},
 	}
 	k := resp.Key

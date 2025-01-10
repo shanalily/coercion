@@ -60,6 +60,7 @@ func (p reader) blockRowToBlock(ctx context.Context, response *azcosmos.ItemResp
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,
 			End:    resp.StateEnd,
+			ETag:   resp.ETag,
 		},
 		Concurrency:       resp.Concurrency,
 		ToleratedFailures: resp.ToleratedFailures,

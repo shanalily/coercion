@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	// "github.com/go-json-experiment/json"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/internal/private"
 	"github.com/element-of-surprise/coercion/workflow"
 	"github.com/element-of-surprise/coercion/workflow/storage"
-	// "github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
 var _ storage.PlanUpdater = planUpdater{}
@@ -36,20 +36,19 @@ func (u planUpdater) UpdatePlan(ctx context.Context, p *workflow.Plan) error {
 	patch.AppendReplace("/stateStart", p.State.Start)
 	patch.AppendReplace("/stateEnd", p.State.End)
 
-	// var ifMatchEtag *azcore.ETag = nil
-	// if etag, ok := h.GetEtag(item); ok {
-	// 	ifMatchEtag = (*azcore.ETag)(&etag)
-	// }
+	var ifMatchEtag *azcore.ETag = nil
+	if p.State.ETag != "" {
+		ifMatchEtag = (*azcore.ETag)(&p.State.ETag)
+	}
 	itemOpt := &azcosmos.ItemOptions{
 		EnableContentResponseOnWrite: true,
-		// IfMatchEtag:                  ifMatchEtag,
+		IfMatchEtag:                  ifMatchEtag,
 	}
 
 	// save the item into Cosmos DB
 	res, err := u.cc.PatchItem(ctx, u.pk, p.ID.String(), patch, itemOpt)
 	if err != nil {
-		// return fmt.Errorf("failed to update item through Cosmos DB API: %w", cosmosErr(err))
-		return fmt.Errorf("failed to write item through Cosmos DB API: %w", err)
+		return fmt.Errorf("failed to patch item through Cosmos DB API: %w", err)
 	}
 	fmt.Println(res.ETag)
 

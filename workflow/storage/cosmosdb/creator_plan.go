@@ -226,23 +226,9 @@ func blockToEntry(ctx context.Context, pk string, planID uuid.UUID, pos int, b *
 }
 
 func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, seq *workflow.Sequence) error {
-	actions, err := objsToIDs(seq.Actions)
+	sequence, err := sequenceToEntry(ctx, u.cc.GetPKString(), planID, pos, seq)
 	if err != nil {
-		return fmt.Errorf("objsToIDs(actions): %w", err)
-	}
-
-	sequence := sequencesEntry{
-		PartitionKey: u.cc.GetPKString(),
-		ID:           seq.ID,
-		Key:          seq.Key,
-		PlanID:       planID,
-		Name:         seq.Name,
-		Descr:        seq.Descr,
-		Pos:          pos,
-		Actions:      actions,
-		StateStatus:  seq.State.Status,
-		StateStart:   seq.State.Start,
-		StateEnd:     seq.State.End,
+		return err
 	}
 
 	for i, a := range seq.Actions {
@@ -265,32 +251,31 @@ func (u creator) commitSequence(ctx context.Context, planID uuid.UUID, pos int, 
 	return nil
 }
 
-func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a *workflow.Action) error {
-	req, err := json.Marshal(a.Req)
+func sequenceToEntry(ctx context.Context, pk string, planID uuid.UUID, pos int, seq *workflow.Sequence) (sequencesEntry, error) {
+	actions, err := objsToIDs(seq.Actions)
 	if err != nil {
-		return fmt.Errorf("json.Marshal(req): %w", err)
+		return sequencesEntry{}, fmt.Errorf("objsToIDs(actions): %w", err)
 	}
 
-	attempts, err := encodeAttempts(a.Attempts)
-	if err != nil {
-		return fmt.Errorf("can't encode action.Attempts: %w", err)
-	}
-	action := actionsEntry{
-		PartitionKey: u.cc.GetPKString(),
-		ID:           a.ID,
-		Key:          a.Key,
+	return sequencesEntry{
+		PartitionKey: pk,
+		ID:           seq.ID,
+		Key:          seq.Key,
 		PlanID:       planID,
-		Name:         a.Name,
-		Descr:        a.Descr,
+		Name:         seq.Name,
+		Descr:        seq.Descr,
 		Pos:          pos,
-		Plugin:       a.Plugin,
-		Timeout:      a.Timeout,
-		Retries:      a.Retries,
-		Req:          req,
-		Attempts:     attempts,
-		StateStatus:  a.State.Status,
-		StateStart:   a.State.Start,
-		StateEnd:     a.State.End,
+		Actions:      actions,
+		StateStatus:  seq.State.Status,
+		StateStart:   seq.State.Start,
+		StateEnd:     seq.State.End,
+	}, nil
+}
+
+func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a *workflow.Action) error {
+	action, err := actionToEntry(ctx, u.cc.GetPKString(), planID, pos, a)
+	if err != nil {
+		return err
 	}
 
 	itemOpt := &azcosmos.ItemOptions{
@@ -306,6 +291,34 @@ func (u creator) commitAction(ctx context.Context, planID uuid.UUID, pos int, a 
 	}
 
 	return nil
+}
+
+func actionToEntry(ctx context.Context, pk string, planID uuid.UUID, pos int, a *workflow.Action) (actionsEntry, error) {
+	req, err := json.Marshal(a.Req)
+	if err != nil {
+		return actionsEntry{}, fmt.Errorf("json.Marshal(req): %w", err)
+	}
+	attempts, err := encodeAttempts(a.Attempts)
+	if err != nil {
+		return actionsEntry{}, fmt.Errorf("can't encode action.Attempts: %w", err)
+	}
+	return actionsEntry{
+		PartitionKey: pk,
+		ID:           a.ID,
+		Key:          a.Key,
+		PlanID:       planID,
+		Name:         a.Name,
+		Descr:        a.Descr,
+		Pos:          pos,
+		Plugin:       a.Plugin,
+		Timeout:      a.Timeout,
+		Retries:      a.Retries,
+		Req:          req,
+		Attempts:     attempts,
+		StateStatus:  a.State.Status,
+		StateStart:   a.State.Start,
+		StateEnd:     a.State.End,
+	}, nil
 }
 
 // encodeAttempts encodes a slice of attempts into a JSON array hodling JSON encoded attempts as byte slices.

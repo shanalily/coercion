@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
-	"unsafe"
 
 	"github.com/element-of-surprise/coercion/plugins/registry"
 	"github.com/element-of-surprise/coercion/workflow"
@@ -238,60 +236,4 @@ func (r reader) listResultsFunc(item []byte) (storage.ListResult, error) {
 
 func (r reader) private() {
 	return
-}
-
-// fieldToID returns a uuid.UUID from a field "field" in the Stmt that must be a TEXT field.
-func fieldToID(id string) (uuid.UUID, error) {
-	return uuid.Parse(id)
-}
-
-// fieldToIDs returns the IDs from the statement field. Field must the a blob
-// encoded as a JSON array that has string UUIDs in v7 format.
-func strToIDs(id string) ([]uuid.UUID, error) {
-	contents := strToBytes(id)
-	if contents == nil {
-		return nil, fmt.Errorf("actions IDs are nil")
-	}
-	strIDs := []string{}
-	if err := json.Unmarshal(contents, &strIDs); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal action ids: %w", err)
-	}
-	ids := make([]uuid.UUID, 0, len(strIDs))
-	for _, id := range strIDs {
-		u, err := uuid.Parse(id)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse id(%s): %w", id, err)
-		}
-		ids = append(ids, u)
-	}
-
-	return ids, nil
-}
-
-func strToBytes(s string) []byte {
-	return unsafe.Slice(unsafe.StringData(s), len(s))
-}
-
-// // fieldToBytes returns the bytes of the field from the statement.
-// func fieldToBytes(val any) []byte {
-// 	b := make([]byte, val)
-// 	return b
-// }
-
-func timeFromInt64(unixTime int64) (time.Time, error) {
-	t := time.Unix(0, unixTime)
-	if t.Before(zeroTime) {
-		return time.Time{}, nil
-	}
-	return t, nil
-}
-
-// fieldToState pulls the stateStart, stateEnd and stateStatus from a stmt
-// and turns them into a *workflow.State.
-func fieldToState(stateStatus int64, stateStart, stateEnd time.Time) *workflow.State {
-	return &workflow.State{
-		Status: workflow.Status(stateStatus),
-		Start:  stateStart,
-		End:    stateEnd,
-	}
 }

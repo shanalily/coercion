@@ -25,6 +25,11 @@ func defaultOpt() *azcosmos.ItemOptions {
 	}
 }
 
+// consider using transactional batch here instead of updating everything separately.
+// actually this only works for one contains :(
+// do I need to rethink this and put stuff in the same container? but then indexes might not work?
+// I could at least group things together wherever there's a loop, like actions
+
 // commitPlan commits a plan to the database. This commits the entire plan and all sub-objects.
 func (u creator) commitPlan(ctx context.Context, p *workflow.Plan) (err error) {
 	plan, err := planToEntry(ctx, u.cc.GetPKString(), p)

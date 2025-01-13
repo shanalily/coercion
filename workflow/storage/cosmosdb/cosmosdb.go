@@ -62,6 +62,7 @@ type ContainerClient interface {
 	CreateItem(context.Context, azcosmos.PartitionKey, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	DeleteItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	NewQueryItemsPager(string, azcosmos.PartitionKey, *azcosmos.QueryOptions) *runtime.Pager[azcosmos.QueryItemsResponse]
+	NewTransactionalBatch(azcosmos.PartitionKey) azcosmos.TransactionalBatch
 	Read(context.Context, *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error)
 	ReadItem(context.Context, azcosmos.PartitionKey, string, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
 	ReplaceItem(context.Context, azcosmos.PartitionKey, string, []byte, *azcosmos.ItemOptions) (azcosmos.ItemResponse, error)
@@ -248,6 +249,11 @@ func New(ctx context.Context, endpoint, dbName, pk string, cred azcore.TokenCred
 	// create container for customer? or container per table for all customers?
 	// multiple containers per customer?
 	// need containers/tables for plans, blocks, checks, sequences, and actions.
+	// What happens if the connection is broken? The credential will expire at some
+	// point so the client will need to be recreated before that happens.
+	// The Get_Client functions could return a new client every time, but it would
+	// be nice to reuse the connection for all actions, blocks, etc in the same
+	// plan execution.
 	cc, err := createContainerClients(ctx, dbName, endpoint, pk, client)
 	if err != nil {
 		return nil, err

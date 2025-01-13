@@ -193,6 +193,11 @@ func (cc FakeContainerClient) NewQueryItemsPager(query string, partitionKey azco
 	return cc.NewListItemsRawPagerResult
 }
 
+func (cc FakeContainerClient) NewTransactionalBatch(partitionKey azcosmos.PartitionKey) azcosmos.TransactionalBatch {
+	// return cc.NewListItemsRawPagerResult
+	return azcosmos.TransactionalBatch{}
+}
+
 func (cc FakeContainerClient) Read(ctx context.Context, o *azcosmos.ReadContainerOptions) (azcosmos.ContainerResponse, error) {
 	return azcosmos.ContainerResponse{}, nil
 }

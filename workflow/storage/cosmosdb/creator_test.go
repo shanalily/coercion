@@ -124,10 +124,12 @@ func TestCreate(t *testing.T) {
 		// to make sure it causes the entire plan creation to fail.
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		ctx := context.Background()
 
-		r, cc := dbSetup(test.enforceETag)
+		cName := fmt.Sprintf("test-create-%d", i)
+		r, cc := dbSetup(cName, test.enforceETag)
+		defer dbTeardown(cName)
 
 		if err := r.Create(ctx, existingPlan); err != nil {
 			t.Fatalf("TestExists(%s): %s", test.name, err)

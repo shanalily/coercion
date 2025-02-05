@@ -90,10 +90,12 @@ func TestDelete(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		ctx := context.Background()
 
-		r, cc := dbSetup(test.enforceETag)
+		cName := fmt.Sprintf("test-delete-%d", i)
+		r, cc := dbSetup(cName, test.enforceETag)
+		defer dbTeardown(cName)
 
 		testPlanID := mustUUID()
 		if test.plan != nil {

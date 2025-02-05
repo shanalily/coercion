@@ -167,8 +167,10 @@ type FakeCosmosDBClient struct {
 	enforceETag  bool
 
 	client *FakeContainerClient
+	simclient *azcosmos.ContainerClient
 
-	batch *FakeTransactionalBatch
+	// batch *FakeTransactionalBatch
+	batch *azcosmos.TransactionalBatch
 
 	// create count per document type during ExecuteTransactionalBatch
 	createCallCount map[Type]int
@@ -180,10 +182,8 @@ type FakeCosmosDBClient struct {
 }
 
 // NewFakeCosmosDBClient returns a new FakeCosmosDBClient.
-func NewFakeCosmosDBClient(enforceETag bool) *FakeCosmosDBClient {
+func NewFakeCosmosDBClient(simclient *azcosmos.ContainerClient, partitionKey string, enforceETag bool) *FakeCosmosDBClient {
 	documents := make(map[string][]byte)
-
-	partitionKey := "fakePartitionKey"
 
 	fakeContainerClient := FakeContainerClient{
 		documents: documents,
@@ -194,6 +194,7 @@ func NewFakeCosmosDBClient(enforceETag bool) *FakeCosmosDBClient {
 		partitionKey: partitionKey,
 		enforceETag:  enforceETag,
 		client:       &fakeContainerClient,
+		simclient: simclient,
 
 		createCallCount: map[Type]int{},
 		deleteCallCount: map[Type]int{},
@@ -202,7 +203,8 @@ func NewFakeCosmosDBClient(enforceETag bool) *FakeCosmosDBClient {
 
 // GetContainerClient returns the container client.
 func (c *FakeCosmosDBClient) GetContainerClient() ContainerClient {
-	return c.client
+	// return c.client
+	return c.simclient
 }
 
 // GetPK returns the partition key.
@@ -217,16 +219,19 @@ func (c *FakeCosmosDBClient) GetPKString() string {
 
 // NewTransactionalBatch returns a new fake TransactionalBatch.
 func (c *FakeCosmosDBClient) NewTransactionalBatch() TransactionalBatch {
-	// initialize maps
-	return &FakeTransactionalBatch{
-		createItems: map[string][]byte{},
-		deleteItems: []string{},
-	}
+	batch := c.simclient.NewTransactionalBatch(c.GetPK())
+	return &batch
+	// // initialize maps
+	// return &FakeTransactionalBatch{
+	// 	createItems: map[string][]byte{},
+	// 	deleteItems: []string{},
+	// }
 }
 
 // SetBatch sets the batch.
 func (b *FakeCosmosDBClient) SetBatch(batch TransactionalBatch) {
-	b.batch = batch.(*FakeTransactionalBatch)
+	// b.batch = batch.(*FakeTransactionalBatch)
+	b.batch = batch.(*azcosmos.TransactionalBatch)
 }
 
 // ItemOptions returns the item options.
@@ -241,40 +246,46 @@ func (c *FakeCosmosDBClient) EnforceETag() bool {
 
 // ExecuteTransactionalBatch executes the fake transactional batch by adding to or deleting from the documents map.
 func (c *FakeCosmosDBClient) ExecuteTransactionalBatch(ctx context.Context, b TransactionalBatch, o *azcosmos.TransactionalBatchOptions) (azcosmos.TransactionalBatchResponse, error) {
-	if c.createErr != nil {
-		return azcosmos.TransactionalBatchResponse{}, c.createErr
+	if b == nil {
+		return azcosmos.TransactionalBatchResponse{}, fmt.Errorf("nil transactional batch")
 	}
-	for id, item := range c.batch.createItems {
-		c.client.documents[id] = item
+	batch := b.(*azcosmos.TransactionalBatch)
+	return c.simclient.ExecuteTransactionalBatch(ctx, *batch, nil)
 
-		fields, err := getCommonFields(item)
-		if err != nil {
-			return azcosmos.TransactionalBatchResponse{}, err
-		}
-		c.createCallCount[fields.Type]++
-	}
-	// clear create items
-	c.batch.createItems = map[string][]byte{}
+	// if c.createErr != nil {
+	// 	return azcosmos.TransactionalBatchResponse{}, c.createErr
+	// }
+	// for id, item := range c.batch.createItems {
+	// 	c.client.documents[id] = item
 
-	if c.deleteErr != nil {
-		return azcosmos.TransactionalBatchResponse{}, c.deleteErr
-	}
-	for _, id := range c.batch.deleteItems {
-		item, ok := c.client.documents[id]
-		delete(c.client.documents, id)
+	// 	fields, err := getCommonFields(item)
+	// 	if err != nil {
+	// 		return azcosmos.TransactionalBatchResponse{}, err
+	// 	}
+	// 	c.createCallCount[fields.Type]++
+	// }
+	// // clear create items
+	// c.batch.createItems = map[string][]byte{}
 
-		if ok {
-			fields, err := getCommonFields(item)
-			if err != nil {
-				return azcosmos.TransactionalBatchResponse{}, err
-			}
-			c.deleteCallCount[fields.Type]++
-		}
-	}
-	// clear delete items
-	c.batch.deleteItems = []string{}
+	// if c.deleteErr != nil {
+	// 	return azcosmos.TransactionalBatchResponse{}, c.deleteErr
+	// }
+	// for _, id := range c.batch.deleteItems {
+	// 	item, ok := c.client.documents[id]
+	// 	delete(c.client.documents, id)
 
-	return azcosmos.TransactionalBatchResponse{}, nil
+	// 	if ok {
+	// 		fields, err := getCommonFields(item)
+	// 		if err != nil {
+	// 			return azcosmos.TransactionalBatchResponse{}, err
+	// 		}
+	// 		c.deleteCallCount[fields.Type]++
+	// 	}
+	// }
+	// // clear delete items
+	// c.batch.deleteItems = []string{}
+
+	// return azcosmos.TransactionalBatchResponse{}, nil
 }
 
 // FakeContainerClient has the methods for operations on single container items.
@@ -421,19 +432,62 @@ func getCommonFields(data []byte) (commonFields, error) {
 	return c, nil
 }
 
-func dbSetup(enforceETag bool) (*Vault, *FakeCosmosDBClient) {
-	cName := "test-container"
+func dbSetup(cName string, enforceETag bool) (*Vault, *FakeCosmosDBClient) {
+	cosmosDbEndpoint := "http://localhost:8081"
+	cosmosDbKey := "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+	// connectionString := fmt.Sprintf("AccountEndpoint=%s;AccountKey=%s;", endpoint, key)
+	dbName := "test-db"
+	pKey := "test-partition"
 
 	reg := registry.New()
 	reg.MustRegister(&plugins.CheckPlugin{})
 	reg.MustRegister(&plugins.HelloPlugin{})
 
-	cc := NewFakeCosmosDBClient(enforceETag)
+	cred, err := azcosmos.NewKeyCredential(cosmosDbKey)
+	if err != nil {
+		panic(err)
+	}
+	client, err := azcosmos.NewClientWithKey(cosmosDbEndpoint, cred, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// databaseProperties := azcosmos.DatabaseProperties{ID: dbName}
+	// response, err := client.CreateDatabase(context.Background(), databaseProperties, nil)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(response)
+	database, err := client.NewDatabase(dbName)
+	if err != nil {
+		panic(err)
+	}
+	properties := azcosmos.ContainerProperties{
+		ID: cName,
+		PartitionKeyDefinition: azcosmos.PartitionKeyDefinition{
+			Paths: []string{"/partitionKey"},
+		},
+	}
+
+	throughput := azcosmos.NewManualThroughputProperties(400)
+	resp, err := database.CreateContainer(context.Background(), properties, &azcosmos.CreateContainerOptions{ThroughputProperties: &throughput})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(resp)
+
+	container, err := client.NewContainer(dbName, cName)
+	if err != nil {
+		panic(err)
+	}
+
+
+	cc := NewFakeCosmosDBClient(container, pKey, enforceETag)
 	mu := &sync.Mutex{}
 	r := &Vault{
-		dbName:       "test-db",
+		dbName:       dbName,
 		cName:        cName,
-		partitionKey: "test-partition",
+		partitionKey: pKey,
 	}
 	r.reader = reader{cName: cName, Client: cc, reg: reg}
 	r.creator = creator{mu: mu, Client: cc, reader: r.reader}
@@ -442,4 +496,26 @@ func dbSetup(enforceETag bool) (*Vault, *FakeCosmosDBClient) {
 	r.deleter = deleter{mu: mu, Client: cc, reader: r.reader}
 
 	return r, cc
+}
+
+func dbTeardown(cName string) {
+	cosmosDbEndpoint := "http://localhost:8081"
+	cosmosDbKey := "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+	dbName := "test-db"
+
+	cred, err := azcosmos.NewKeyCredential(cosmosDbKey)
+	if err != nil {
+		panic(err)
+	}
+	client, err := azcosmos.NewClientWithKey(cosmosDbEndpoint, cred, nil)
+	if err != nil {
+		panic(err)
+	}
+	container, err := client.NewContainer(dbName, cName)
+	if err != nil {
+		panic(err)
+	}
+	if _, err := container.Delete(context.Background(), nil); err != nil {
+		panic(err)
+	}
 }

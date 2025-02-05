@@ -238,11 +238,13 @@ func TestExists(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		ctx := context.Background()
 
 		enforceETag := true
-		r, cc := dbSetup(enforceETag)
+		cName := fmt.Sprintf("test-exists-%d", i)
+		r, cc := dbSetup(cName, enforceETag)
+		defer dbTeardown(cName)
 
 		if err := r.Create(ctx, plan0); err != nil {
 			t.Fatalf("TestExists(%s): %s", test.name, err)
@@ -299,11 +301,13 @@ func TestRead(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		ctx := context.Background()
 
 		enforceETag := true
-		r, _ := dbSetup(enforceETag)
+		cName := fmt.Sprintf("test-read-%d", i)
+		r, _ := dbSetup(cName, enforceETag)
+		defer dbTeardown(cName)
 
 		if err := r.Create(ctx, plan0); err != nil {
 			t.Fatalf("TestRead(%s): %s", test.name, err)

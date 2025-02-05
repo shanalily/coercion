@@ -3,7 +3,6 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/element-of-surprise/coercion/workflow"
@@ -47,7 +46,7 @@ func (p reader) docToChecks(ctx context.Context, response *azcosmos.ItemResponse
 	c := &workflow.Checks{
 		ID:    resp.ID,
 		Key:   resp.Key,
-		Delay: time.Duration(resp.Delay),
+		Delay: resp.Delay,
 		State: &workflow.State{
 			Status: resp.StateStatus,
 			Start:  resp.StateStart,

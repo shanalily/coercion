@@ -16,7 +16,9 @@ func TestStorageItemCRUD(t *testing.T) {
 	ctx := context.Background()
 
 	enforceETag := true
-	r, cc := dbSetup(enforceETag)
+	cName := "test-storage-item-crud"
+	r, cc := dbSetup(cName, enforceETag)
+	// defer dbTeardown(cName)
 
 	// use test plan
 	if err := r.Create(ctx, plan); err != nil {

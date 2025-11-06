@@ -83,6 +83,12 @@ func TestBlobStorageRecovery(t *testing.T) {
 		t.Fatalf("Failed to create plan: %v", err)
 	}
 
+	// Create a plan with long-running actions
+	plan1, err := createLongRunningPlan()
+	if err != nil {
+		t.Fatalf("Failed to create plan1: %v", err)
+	}
+
 	// Create initial workstream
 	ws, err := workstream.New(ctx, reg, vault)
 	if err != nil {
@@ -96,6 +102,13 @@ func TestBlobStorageRecovery(t *testing.T) {
 	}
 
 	t.Logf("Submitted plan with ID: %s", planID)
+
+	planID1, err := ws.Submit(ctx, plan1)
+	if err != nil {
+		t.Fatalf("Failed to submit plan: %v", err)
+	}
+
+	t.Logf("Submitted plan1 with ID: %s", planID1)
 
 	// Create a cancellable context for plan execution
 	executionCtx, cancelExecution := context.WithCancel(ctx)
@@ -121,6 +134,8 @@ func TestBlobStorageRecovery(t *testing.T) {
 		lastResult = result.Data
 		break // Just get the first status update
 	}
+
+	pConfig.Print("Workflow result: \n", lastResult)
 
 	if lastResult.State.Status != workflow.Running {
 		t.Fatalf("Expected plan to be running, got status: %s", lastResult.State.Status)
@@ -198,6 +213,7 @@ func TestBlobStorageRecovery(t *testing.T) {
 		}
 	}
 
+	pConfig.Print("Workflow result: \n", result)
 	t.Log("All validation checks passed")
 }
 

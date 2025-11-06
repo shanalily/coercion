@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	workstream "github.com/element-of-surprise/coercion"
@@ -26,11 +27,13 @@ var (
 	blobMSI     = flag.String("blob_msi", "", "The identity for blob storage. If empty, az login is used.")
 	blobPrefix  = flag.String("blob_prefix", "coercion-recovery-test", "The prefix for blob containers in recovery tests.")
 	skipCleanup = flag.Bool("skip_cleanup", false, "Skip cleanup of blob storage after test.")
+	planCount   = flag.Int("plan_count", 3, "Number of plans to create and start before simulating crash.")
 )
 
 // TestBlobStorageRecovery tests the recovery functionality for blob storage vault.
-// It creates a long-running plan, starts execution, cancels it, then recreates
-// the vault and workstream to verify recovery works correctly.
+// It creates multiple long-running plans (configurable via -plan_count flag),
+// starts execution of all plans, simulates a crash, then recreates the vault
+// and workstream to verify recovery works correctly. Only prints one plan result.
 func TestBlobStorageRecovery(t *testing.T) {
 	flag.Parse()
 
@@ -77,54 +80,47 @@ func TestBlobStorageRecovery(t *testing.T) {
 		t.Fatalf("Failed to create blob vault: %v", err)
 	}
 
-	// Create a plan with long-running actions
-	plan, err := createLongRunningPlan()
-	if err != nil {
-		t.Fatalf("Failed to create plan: %v", err)
-	}
-
-	// Create a plan with long-running actions
-	plan1, err := createLongRunningPlan()
-	if err != nil {
-		t.Fatalf("Failed to create plan1: %v", err)
-	}
-
 	// Create initial workstream
 	ws, err := workstream.New(ctx, reg, vault)
 	if err != nil {
 		t.Fatalf("Failed to create workstream: %v", err)
 	}
 
-	// Submit the plan
-	planID, err := ws.Submit(ctx, plan)
-	if err != nil {
-		t.Fatalf("Failed to submit plan: %v", err)
+	// Create and submit multiple plans
+	var planIDs []uuid.UUID
+	for i := 0; i < *planCount; i++ {
+		plan, err := createLongRunningPlan()
+		if err != nil {
+			t.Fatalf("Failed to create plan %d: %v", i+1, err)
+		}
+
+		planID, err := ws.Submit(ctx, plan)
+		if err != nil {
+			t.Fatalf("Failed to submit plan %d: %v", i+1, err)
+		}
+
+		planIDs = append(planIDs, planID)
+		t.Logf("Submitted plan %d with ID: %s", i+1, planID)
 	}
-
-	t.Logf("Submitted plan with ID: %s", planID)
-
-	planID1, err := ws.Submit(ctx, plan1)
-	if err != nil {
-		t.Fatalf("Failed to submit plan: %v", err)
-	}
-
-	t.Logf("Submitted plan1 with ID: %s", planID1)
 
 	// Create a cancellable context for plan execution
 	executionCtx, cancelExecution := context.WithCancel(ctx)
 
-	// Start the plan with the cancellable execution context
-	if err := ws.Start(executionCtx, planID); err != nil {
-		t.Fatalf("Failed to start plan: %v", err)
+	// Start all plans with the cancellable execution context
+	for i, planID := range planIDs {
+		if err := ws.Start(executionCtx, planID); err != nil {
+			t.Fatalf("Failed to start plan %d (%s): %v", i+1, planID, err)
+		}
+		t.Logf("Started plan %d (%s)", i+1, planID)
 	}
 
-	t.Log("Plan started, waiting for execution to begin...")
+	t.Logf("All %d plans started, waiting for execution to begin...", len(planIDs))
 
 	// Wait a short time to ensure execution has started
 	time.Sleep(5 * time.Second)
 
-	// Check that the plan is running
-	status := ws.Status(ctx, planID, 1*time.Second)
+	// Check that the first plan is running
+	status := ws.Status(ctx, planIDs[0], 1*time.Second)
 
 	var lastResult *workflow.Plan
 	for result := range status {
@@ -157,6 +153,8 @@ func TestBlobStorageRecovery(t *testing.T) {
 	// Simulate system restart by creating new vault and workstream
 	t.Log("Simulating system restart - creating new vault and workstream...")
 
+	time.Sleep(5 * time.Minute) // wait for "leader election"
+
 	// Create new vault with recovery enabled (default)
 	recoveryVault, err := azblob.New(ctx, testPrefix, *blobURL, cred, reg)
 	if err != nil {
@@ -176,44 +174,44 @@ func TestBlobStorageRecovery(t *testing.T) {
 
 	t.Log("Recovery workstream created, attempting to recover plan...")
 
-	// Wait for the recovered plan to complete or timeout
+	// Wait for the recovered first plan to complete or timeout
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	result, err := recoveryWS.Wait(ctx, planID)
-	if err != nil {
-		t.Fatalf("Failed to wait for recovered plan: %v", err)
-	}
-
-	// Verify the plan completed successfully
-	if result.State.Status != workflow.Completed {
-		t.Fatalf("Expected recovered plan to complete, got status: %s", result.State.Status)
-	}
-
-	t.Log("Recovery test successful: Plan completed after recovery")
-
-	// Additional validation: Check that some actions were actually executed
-	if len(result.Blocks) == 0 {
-		t.Fatal("Expected plan to have blocks")
-	}
-
-	for _, block := range result.Blocks {
-		if block.State.Status != workflow.Completed {
-			t.Errorf("Block %s did not complete, status: %s", block.ID, block.State.Status)
+	for _, planID := range planIDs {
+		result, err := recoveryWS.Wait(ctx, planID)
+		if err != nil {
+			t.Fatalf("Failed to wait for recovered plan: %v", err)
 		}
-		for _, seq := range block.Sequences {
-			if seq.State.Status != workflow.Completed {
-				t.Errorf("Sequence %s did not complete, status: %s", seq.ID, seq.State.Status)
+		if result.State.Status != workflow.Completed {
+			t.Fatalf("Expected recovered plan to complete, got status: %s", result.State.Status)
+		}
+		// Additional validation: Check that some actions were actually executed
+		if len(result.Blocks) == 0 {
+			t.Fatal("Expected plan to have blocks")
+		}
+
+		for _, block := range result.Blocks {
+			if block.State.Status != workflow.Completed {
+				t.Errorf("Block %s did not complete, status: %s", block.ID, block.State.Status)
 			}
-			for _, action := range seq.Actions {
-				if action.State.Status != workflow.Completed {
-					t.Errorf("Action %s did not complete, status: %s", action.ID, action.State.Status)
+			for _, seq := range block.Sequences {
+				if seq.State.Status != workflow.Completed {
+					t.Errorf("Sequence %s did not complete, status: %s", seq.ID, seq.State.Status)
+				}
+				for _, action := range seq.Actions {
+					if action.State.Status != workflow.Completed {
+						t.Errorf("Action %s did not complete, status: %s", action.ID, action.State.Status)
+					}
 				}
 			}
 		}
+		lastResult = result
 	}
 
-	pConfig.Print("Workflow result: \n", result)
+	t.Logf("Recovery test successful: First plan (of %d) completed after recovery", len(planIDs))
+
+	pConfig.Print("Workflow result: \n", lastResult)
 	t.Log("All validation checks passed")
 }
 
@@ -251,8 +249,8 @@ func createLongRunningPlan() (*workflow.Plan, error) {
 				Name:    "long-action",
 				Descr:   "Long-running action for recovery testing",
 				Plugin:  testplugin.Name,
-				Timeout: 2 * time.Minute,                                      // Timeout for the long-running action
-				Req:     testplugin.Req{Sleep: 30 * time.Second, Arg: "long"}, // 30 second sleep (shortened for testing)
+				Timeout: 7 * time.Minute,                                      // Timeout for the long-running action
+				Req:     testplugin.Req{Sleep: 5 * time.Minute, Arg: "long"}, // 30 second sleep (shortened for testing)
 			},
 			{
 				Name:    "final-action",

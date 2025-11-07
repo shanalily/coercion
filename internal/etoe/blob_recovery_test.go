@@ -1,7 +1,6 @@
 package etoe
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow/builder"
 	"github.com/element-of-surprise/coercion/workflow/storage/azblob"
 	"github.com/element-of-surprise/coercion/workflow/utils/clone"
+	"github.com/gostdlib/base/context"
 
 	testplugin "github.com/element-of-surprise/coercion/internal/execute/sm/testing/plugins"
 )
@@ -29,9 +29,8 @@ var (
 )
 
 // TestBlobStorageRecovery tests the recovery functionality for blob storage vault.
-// It creates multiple long-running plans (configurable via -plan_count flag),
-// starts execution of all plans, simulates a crash, then recreates the vault
-// and workstream to verify recovery works correctly. Only prints one plan result.
+// It creates a long-running plan, starts execution of the plan, simulates a restart,
+// then recreates the vault and workstream to verify recovery works correctly.
 func TestBlobStorageRecovery(t *testing.T) {
 	flag.Parse()
 
@@ -158,6 +157,7 @@ func TestBlobStorageRecovery(t *testing.T) {
 	}()
 
 	// Create new workstream for recovery
+	// This should rerun recovery.
 	recoveryWS, err := workstream.New(ctx, reg, recoveryVault)
 	if err != nil {
 		t.Fatalf("Failed to create recovery workstream: %v", err)
@@ -168,13 +168,21 @@ func TestBlobStorageRecovery(t *testing.T) {
 	// Wait for the recovered first plan to complete or timeout
 	// ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	// defer cancel()
+	//
+	time.Sleep(5 * time.Minute)
 
-	// start plan again after recovery
-	// what should I check before running?
-	if err := ws.Start(ctx, planID); err != nil {
-		t.Fatalf("Failed to start plan %s: %v", planID, err)
+	fetchedPlan, err := recoveryWS.Plan(ctx, planID)
+	if err != nil {
+		t.Fatalf("Failed to retrieve plan %s for recovery: %v", planID, err)
 	}
-	t.Logf("Started plan %s after restart", planID)
+
+	// Start plan again after recovery, if there is still work to be done.
+	if fetchedPlan.State.Status == workflow.NotStarted {
+		if err := recoveryWS.Start(ctx, planID); err != nil {
+			t.Fatalf("Failed to start plan %s: %v", planID, err)
+		}
+		t.Logf("Started plan %s after restart", planID)
+	}
 
 	result, err := recoveryWS.Wait(ctx, planID)
 	if err != nil {

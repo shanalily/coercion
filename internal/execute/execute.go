@@ -14,6 +14,7 @@ import (
 	"github.com/element-of-surprise/coercion/workflow/storage"
 	"github.com/element-of-surprise/coercion/workflow/utils/walk"
 	"github.com/google/uuid"
+	"github.com/kylelemons/godebug/pretty"
 
 	"github.com/gostdlib/base/concurrency/sync"
 	"github.com/gostdlib/base/statemachine"
@@ -22,6 +23,13 @@ import (
 var (
 	ErrNotFound = errors.New("not found")
 )
+
+var pConfig = pretty.Config{
+	IncludeUnexported: false,
+	PrintStringers:    true,
+	SkipZeroFields:    true,
+}
+
 
 // runner runs a Plan through the statemachine.
 // In production this is the statemachine.Run function.
@@ -164,6 +172,8 @@ func (e *Plans) Start(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	// is what's wrong about this, that it shouldn't be run on recovered plans?
+	// the validation is not running in my recover test.
 	if err := e.validateStartState(ctx, plan); err != nil {
 		return errors.E(ctx, errors.CatInternal, errors.TypeBug, err)
 	}
@@ -286,6 +296,7 @@ func (p *Plans) validateStartState(ctx context.Context, plan *workflow.Plan) err
 		return fmt.Errorf("plan is stale, submit time is too old")
 	}
 
+	// failing here on recovery with blob storage, like NotStarted state or too old
 	for item := range walk.Plan(plan) {
 		for _, v := range p.validators {
 			if err := v(item); err != nil {
@@ -368,6 +379,7 @@ func (e *Plans) validateState(i walk.Item) error {
 		if !state.End.IsZero() {
 			return fmt.Errorf("internal end is not zero")
 		}
+		pConfig.Print("i state: \n", state)
 		return nil
 	}
 	return fmt.Errorf("Object(%T): does not implement getStater", i.Value)

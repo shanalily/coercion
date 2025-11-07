@@ -88,6 +88,7 @@ func New(ctx context.Context, reg *registry.Register, store storage.Vault, optio
 	}
 
 	// Some storage systems may need to recover from a previous state after a crash.
+	// is the plan not being fixed properly here? difference between entry and object maybe?
 	if r, ok := store.(storage.Recovery); ok {
 		if err := r.Recovery(ctx); err != nil {
 			return nil, errors.E(ctx, errors.CatInternal, errors.TypeBug, err)

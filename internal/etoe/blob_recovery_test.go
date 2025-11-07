@@ -119,7 +119,7 @@ func TestBlobStorageRecovery(t *testing.T) {
 	// Wait a short time to ensure execution has started
 	time.Sleep(5 * time.Second)
 
-	// Check that the first plan is running
+	// Check that the first plan is running. Do I need to check all?
 	status := ws.Status(ctx, planIDs[0], 1*time.Second)
 
 	var lastResult *workflow.Plan
@@ -153,7 +153,8 @@ func TestBlobStorageRecovery(t *testing.T) {
 	// Simulate system restart by creating new vault and workstream
 	t.Log("Simulating system restart - creating new vault and workstream...")
 
-	time.Sleep(5 * time.Minute) // wait for "leader election"
+	// time.Sleep(5 * time.Minute) // wait for "leader election"
+	time.Sleep(5 * time.Second) // wait for "leader election"
 
 	// Create new vault with recovery enabled (default)
 	recoveryVault, err := azblob.New(ctx, testPrefix, *blobURL, cred, reg)
@@ -177,6 +178,17 @@ func TestBlobStorageRecovery(t *testing.T) {
 	// Wait for the recovered first plan to complete or timeout
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+
+	// start plans again after recovery
+	// what should I check before running?
+	for i, planID := range planIDs {
+		if err := ws.Start(executionCtx, planID); err != nil {
+			t.Fatalf("Failed to start plan %d (%s): %v", i+1, planID, err)
+		}
+		t.Logf("Started plan %d (%s)", i+1, planID)
+	}
+
+	t.Logf("All %d plans started after recovery, waiting for execution to begin...", len(planIDs))
 
 	for _, planID := range planIDs {
 		result, err := recoveryWS.Wait(ctx, planID)

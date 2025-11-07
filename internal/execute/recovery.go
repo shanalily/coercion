@@ -26,6 +26,7 @@ type recover struct {
 // The recovery process DOES NOT use concurrency due to the fact that the sqlite store is flawed
 // and cannot handle concurrent reads and writes.
 func (r *recover) start(req statemachine.Request[recoverData]) statemachine.Request[recoverData] {
+	// gets running here - what is going wrong when fixing plans during storage recovery?
 	results, err := r.store.Search(req.Ctx, storage.Filters{ByStatus: []workflow.Status{workflow.Running}})
 	if err != nil {
 		req.Err = err

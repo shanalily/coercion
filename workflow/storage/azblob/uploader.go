@@ -181,43 +181,29 @@ func (u *uploader) uploadBlockBlob(ctx context.Context, containerName string, pl
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
 
-	g := u.pool.Group()
-
 	blockBlobName := blockBlobName(planID, block.ID)
-	g.Go(
-		ctx,
-		func(ctx context.Context) error {
-			if err := u.client.UploadBlob(ctx, containerName, blockBlobName, nil, blockData); err != nil {
-				return fmt.Errorf("failed to upload block blob: %w", err)
-			}
-			return nil
-		},
-	)
+	if err := u.client.UploadBlob(ctx, containerName, blockBlobName, nil, blockData); err != nil {
+		return fmt.Errorf("failed to upload block blob: %w", err)
+	}
 
 	for _, checks := range []*workflow.Checks{block.BypassChecks, block.PreChecks, block.PostChecks, block.ContChecks, block.DeferredChecks} {
 		if ctx.Err() != nil {
 			break
 		}
 		if checks != nil {
-			g.Go(
-				ctx,
-				func(ctx context.Context) error {
-					return u.uploadChecksBlob(ctx, containerName, planID, checks)
-				},
-			)
+			if err := u.uploadChecksBlob(ctx, containerName, planID, checks); err != nil {
+				return fmt.Errorf("failed to upload block checks blob: %w", err)
+			}
 		}
 	}
 
 	for i, seq := range block.Sequences {
-		g.Go(
-			ctx,
-			func(ctx context.Context) error {
-				return u.uploadSequenceBlob(ctx, containerName, planID, seq, i)
-			},
-		)
+		if err := u.uploadSequenceBlob(ctx, containerName, planID, seq, i); err != nil {
+			return fmt.Errorf("failed to upload block sequence blob: %w", err)
+		}
 	}
 
-	return g.Wait(ctx)
+	return nil
 }
 
 // uploadSequenceBlob uploads a sequence blob and all its actions.
@@ -232,32 +218,21 @@ func (u *uploader) uploadSequenceBlob(ctx context.Context, containerName string,
 		return fmt.Errorf("failed to marshal sequence: %w", err)
 	}
 
-	g := u.pool.Group()
-
 	seqBlobName := sequenceBlobName(planID, seq.ID)
-	g.Go(
-		ctx,
-		func(ctx context.Context) error {
-			if err := u.client.UploadBlob(ctx, containerName, seqBlobName, nil, seqData); err != nil {
-				return fmt.Errorf("failed to upload sequence blob: %w", err)
-			}
-			return nil
-		},
-	)
+	if err := u.client.UploadBlob(ctx, containerName, seqBlobName, nil, seqData); err != nil {
+		return fmt.Errorf("failed to upload sequence blob: %w", err)
+	}
 
 	for i, action := range seq.Actions {
 		if ctx.Err() != nil {
 			break
 		}
-		g.Go(
-			ctx,
-			func(ctx context.Context) error {
-				return u.uploadActionBlob(ctx, containerName, planID, action, i)
-			},
-		)
+		if err := u.uploadActionBlob(ctx, containerName, planID, action, i); err != nil {
+			return fmt.Errorf("failed to upload sequence action blob: %w", err)
+		}
 	}
 
-	return g.Wait(ctx)
+	return nil
 }
 
 // uploadChecksBlob uploads a checks blob and all its actions.
@@ -272,32 +247,21 @@ func (u *uploader) uploadChecksBlob(ctx context.Context, containerName string, p
 		return fmt.Errorf("failed to marshal checks: %w", err)
 	}
 
-	g := u.pool.Group()
-
 	checksBlobName := checksBlobName(planID, checks.ID)
-	g.Go(
-		ctx,
-		func(ctx context.Context) error {
-			if err := u.client.UploadBlob(ctx, containerName, checksBlobName, nil, checksData); err != nil {
-				return fmt.Errorf("failed to upload checks blob: %w", err)
-			}
-			return nil
-		},
-	)
+	if err := u.client.UploadBlob(ctx, containerName, checksBlobName, nil, checksData); err != nil {
+		return fmt.Errorf("failed to upload checks blob: %w", err)
+	}
 
 	for i, action := range checks.Actions {
 		if ctx.Err() != nil {
 			break
 		}
-		g.Go(
-			ctx,
-			func(ctx context.Context) error {
-				return u.uploadActionBlob(ctx, containerName, planID, action, i)
-			},
-		)
+		if err := u.uploadActionBlob(ctx, containerName, planID, action, i); err != nil {
+			return fmt.Errorf("failed to upload checks action blob: %w", err)
+		}
 	}
 
-	return g.Wait(ctx)
+	return nil
 }
 
 // uploadActionBlob uploads a single action blob.

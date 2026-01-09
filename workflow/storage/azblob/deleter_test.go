@@ -25,7 +25,7 @@ func setupDeleterTest(t *testing.T) (*blobops.Fake, deleter) {
 	// Create plugin registry
 	reg := registry.New()
 	reg.Register(&testPlugins.HelloPlugin{})
-	
+
 	planMu := planlocks.New(ctx)
 
 	// Create reader
